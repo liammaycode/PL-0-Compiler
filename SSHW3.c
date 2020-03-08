@@ -57,12 +57,12 @@ lexeme *createLexeme(token_type t, char *str);
 bool isNumber(char *str);
 bool isSymbol(char symbol);
 void output(lexeme list[], int count, FILE *fplex);
-void getToken(lexeme list[], int *tokens, int index, token current);
+void statement(lexeme list[], int length, token current);
 
 lexeme *createLexeme(token_type t, char *str)
 {
 	// calloc() initializes the 'left' and 'right' pointers to NULL for us.
-	lexeme *l = malloc(1 * sizeof(lexeme));
+	lexeme *l;
 	l->type = t;
   l->lexeme = malloc(sizeof(char) * MAX_IDENT_LENGTH);
   strcpy(l->lexeme, str);
@@ -510,18 +510,208 @@ void output(lexeme list[], int count, FILE *fplex)
 
 // Places the token from the index of the lexeme list and assigns it to current
 // token
-void getToken(lexeme list[], int *tokens, int index, token current)
+void getToken()
 {
-  int i = 0;
+  // int i = 0;
+  //
+  // // Assigning lexeme token at index to current
+  // current.type = list[index].type;
+  //
+  // // If token type is identsym or numbersym, assigning value to next index of array
+  // if (current.type == 2 || current.type == 3)
+  // {
+  //   strcpy(current.value, list[index + 1].lexeme);
+  // }
+}
 
-  // Assigning lexeme token at index to current
-  current.type = list[index].type;
+void findError(int errorNum)
+{
+    switch( errorNum )
+    {
 
-  // If token type is identsym or numbersym, assigning value to next index of array
-  if (current.type == 2 || current.type == 3)
+    case 1:
+      printf("Use = instead of := \n");
+      break;
+
+    case 2:
+      printf("= must be followed by a number \n");
+      break;
+
+    case 3:
+      printf("Identifier must be followed by = \n");
+      break;
+
+    case 4:
+      printf("const, int, procedure must be followed by identifier\n");
+      break;
+
+    case 5:
+      printf("Semicolon or comma missing\n");
+      break;
+
+    case 6:
+      printf("Incorrect symbol after procedure declaration\n");
+      break;
+
+    case 7:
+      printf("Statement expected\n");
+      break;
+
+    case 8:
+      printf("Incorrect symbol after statement part in block\n");
+      break;
+
+    case 9:
+      printf("Period expected\n");
+      break;
+
+    case 10:
+      printf("Semicolon between statements missing\n");
+      break;
+
+    case 11:
+      printf("Undeclared identifier \n");
+      break;
+
+    case 12:
+      printf("Assignment to constant or procedure is not allowed\n");
+      break;
+
+    case 13:
+      printf("Assignment operator expected\n");
+      break;
+
+    case 14:
+      printf("Call must be followed by an identifier\n");
+      break;
+
+    case 15:
+      printf("Call of a constant or variable is meaningless\n");
+      break;
+
+    case 16:
+      printf("Then expected\n");
+      break;
+
+    case 17:
+      printf("Semicolon or } expected \n");
+      break;
+
+    case 18:
+      printf("Do expected\n");
+      break;
+
+    case 19:
+      printf("Incorrect symbol following statement\n");
+      break;
+
+    case 20:
+      printf("Relational operator expected\n");
+      break;
+
+    case 21:
+      printf("Expression must not contain a procedure identifier\n");
+      break;
+
+    case 22:
+      printf("Right parenthesis missing\n");
+      break;
+
+    case 23:
+      printf("The preceding factor cannot begin with this symbol\n");
+      break;
+
+    case 24:
+      printf("An expression cannot begin with this symbol\n");
+      break;
+
+    case 25:
+      printf("This number is too large\n");
+      break;
+
+      default:
+      printf("Invalid instruction");
+
+    }
+}
+
+void insertSymbols(int counter, symbol symbol_table[], int kind, char name[], int val, int level, int addr)
+{
+    //filling in the symbol tables with current data
+    //note: counter needs to be set to zero in main
+    symbol_table[counter].kind = kind;
+    //capture name string and insert it into symbol table as a string
+    strcpy(symbol_table[counter].name, name);
+    symbol_table[counter].val = val;
+    symbol_table[counter].level = level;
+    symbol_table[counter].addr = addr;
+
+    counter++;
+}
+
+void block(lexeme list[], int length, token current)
+{
+  if (current.type == constsym)
   {
-    strcpy(current.value, list[index + 1].lexeme);
+    while (current.type != commasym)
+    {
+      getToken();
+      if (current.type != identsym)
+        findError(4);
+      if (current.type != eqlsym)
+        findError(3);
+      if (current.type != numbersym)
+        findError(2);
+    }
+    if (current.type != semicolonsym)
+      findError(5);
+    getToken();
   }
+  if (current.type = varsym) // ???
+  {
+    while (current.type != commasym)
+    {
+      getToken();
+      if (current.type != identsym)
+        findError(4);
+      getToken();
+    }
+    if (current.type != semicolonsym)
+      findError(5);
+    getToken();
+  }
+  while (current.type == procsym)
+  {
+    getToken();
+    if (current.type != identsym)
+      findError(4); // maybee???????
+    getToken();
+    if (current.type != semicolonsym)
+      findError(5);
+    getToken();
+  }
+  while (current.type == procsym)
+  {
+    getToken();
+    if (current.type != identsym)
+      findError(4); // ???
+    getToken();
+    if (current.type != semicolonsym)
+      findError(5);
+    getToken();
+
+    block(list, length, current);
+
+    if (current.type != semicolonsym)
+      findError(5);
+    getToken();
+  }
+  statement(list, length, current);
+}
+
+void statement(lexeme list[], int length, token current)
+{
+
 }
 
 int main(int argc, char **argv)
@@ -536,7 +726,7 @@ int main(int argc, char **argv)
   symbol symbol_table[MAX_SYMBOL_TABLE_SIZE];
   token current;
 
-  // Output for user that makes error entering command line arguments
+  // output for user that makes error entering command line arguments
   if (argc < 3)
   {
     printf("Err: incorrect program call\nSyntax: ./a.out <inputfilename> <outputfilename>\n");
@@ -567,134 +757,10 @@ int main(int argc, char **argv)
   count = parse(code, list, fplex);
   // Printing output that represents the lexeme array
   output(list, count, fplex);
+  block(list, count, current);
 
   fclose(fpin);
   fclose(fplex);
   return 0;
 }
 
-
-void findError(int errorNum)
-{
-    switch( errorNum )
-    {
-
-    case 1:
-      printf("Use = instead of := \n");
-      break;
-      
-    case 2:
-      printf("= must be followed by a number \n");
-      break;
-      
-    case 3:
-      printf("Identifier must be followed by = \n");
-      break;
-      
-    case 4:
-      printf("const, int, procedure must be followed by identifier\n");
-      break;
-      
-    case 5:
-      printf("Semicolon or comma missing\n");
-      break;
-      
-    case 6:
-      printf("Incorrect symbol after procedure declaration\n");
-      break;
-      
-    case 7:
-      printf("Statement expected\n");
-      break;
-      
-    case 8:
-      printf("Incorrect symbol after statement part in block\n");
-      break;
-      
-    case 9:
-      printf("Period expected\n");
-      break;
-      
-    case 10:
-      printf("Semicolon between statements missing\n");
-      break;
-      
-    case 11:
-      printf("Undeclared identifier \n");
-      break;
-      
-    case 12:
-      printf("Assignment to constant or procedure is not allowed\n");
-      break;
-      
-    case 13:
-      printf("Assignment operator expected\n");
-      break;
-      
-    case 14:
-      printf("Call must be followed by an identifier\n");
-      break;
-      
-    case 15:
-      printf("Call of a constant or variable is meaningless\n");
-      break;
-      
-    case 16:
-      printf("Then expected\n");
-      break;
-      
-    case 17:
-      printf("Semicolon or } expected \n");
-      break;
-      
-    case 18:
-      printf("Do expected\n");
-      break;
-      
-    case 19:
-      printf("Incorrect symbol following statement\n");
-      break;
-      
-    case 20:
-      printf("Relational operator expected\n");
-      break;
-      
-    case 21:
-      printf("Expression must not contain a procedure identifier\n");
-      break;
-      
-    case 22:
-      printf("Right parenthesis missing\n");
-      break;
-      
-    case 23:
-      printf("The preceding factor cannot begin with this symbol\n");
-      break;
-      
-    case 24:
-      printf("An expression cannot begin with this symbol\n");
-      break;
-      
-    case 25:
-      printf("This number is too large\n");
-      break;
-
-      default:
-      printf("Invalid instruction");
-
-    }
-}
-
-void insertSymbols(int kind, char name[], int val, int level, int addr)
-{
-    //filling in the symbol tables with current data
-    //note: counter needs to be set to zero in main 
-    symbol_table[counter].kind = kind;
-    //capture name string and insert it into symbol table as a string
-    strcpy(symbol_table[counter].name, name);
-    symbol_table[counter].val = val;
-    symbol_table[counter].level = level;
-    symbol_table[counter].addr = addr;
-
-    counter++;
-}
