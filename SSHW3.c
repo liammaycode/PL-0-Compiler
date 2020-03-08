@@ -62,7 +62,7 @@ void getToken(lexeme list[], int *tokens, int index, token current);
 lexeme *createLexeme(token_type t, char *str)
 {
 	// calloc() initializes the 'left' and 'right' pointers to NULL for us.
-	lexeme *l = malloc(1 * sizeof(lexeme));
+	lexeme *l;
 	l->type = t;
   l->lexeme = malloc(sizeof(char) * MAX_IDENT_LENGTH);
   strcpy(l->lexeme, str);
