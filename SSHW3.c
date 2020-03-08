@@ -522,19 +522,6 @@ void getToken(lexeme list[], int *tokens, int index, token current)
   {
     strcpy(current.value, list[index + 1].lexeme);
   }
-
-  // int i = 0;
-  // char c, buffer[MAX_CODE_LENGTH] = {'\0'}, token_str[MAX_CODE_LENGTH] = {'\0'};
-  // Copying file contents into character array
-  // c = fgetc(fplex);
-  // while (c != EOF)
-  // {
-  //   token_str[i] = c;
-  //   c = fgetc(fplex);
-  // }
-  // printf("fplex contents:\n%s\n", token_str);
-  // Tokenizing array
-  // Filling tokens array with int values of tokens
 }
 
 int main(int argc, char **argv)
@@ -580,8 +567,6 @@ int main(int argc, char **argv)
   count = parse(code, list, fplex);
   // Printing output that represents the lexeme array
   output(list, count, fplex);
-  // Filling tokens array with lexemes from fplex
-  // getToken(fplex, tokens);
 
   fclose(fpin);
   fclose(fplex);
