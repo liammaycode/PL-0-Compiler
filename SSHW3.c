@@ -57,7 +57,12 @@ lexeme *createLexeme(token_type t, char *str);
 bool isNumber(char *str);
 bool isSymbol(char symbol);
 void output(lexeme list[], int count, FILE *fplex);
-void statement(lexeme list[], int length, token current);
+void block(token current);
+void statement(token current);
+void condition(token current);
+void expression(token current);
+void term(token current);
+void factor(token current);
 
 lexeme *createLexeme(token_type t, char *str)
 {
@@ -510,7 +515,7 @@ void output(lexeme list[], int count, FILE *fplex)
 
 // Places the token from the index of the lexeme list and assigns it to current
 // token
-void getToken()
+void getToken(token current)
 {
   // int i = 0;
   //
@@ -631,31 +636,30 @@ void findError(int errorNum)
 
       default:
       printf("Invalid instruction");
-
     }
 }
 
 void insertSymbols(int counter, symbol symbol_table[], int kind, char name[], int val, int level, int addr)
 {
-    //filling in the symbol tables with current data
-    //note: counter needs to be set to zero in main
-    symbol_table[counter].kind = kind;
-    //capture name string and insert it into symbol table as a string
-    strcpy(symbol_table[counter].name, name);
-    symbol_table[counter].val = val;
-    symbol_table[counter].level = level;
-    symbol_table[counter].addr = addr;
+  //filling in the symbol tables with current data
+  //note: counter needs to be set to zero in main
+  symbol_table[counter].kind = kind;
+  //capture name string and insert it into symbol table as a string
+  strcpy(symbol_table[counter].name, name);
+  symbol_table[counter].val = val;
+  symbol_table[counter].level = level;
+  symbol_table[counter].addr = addr;
 
-    counter++;
+  counter++;
 }
 
-void block(lexeme list[], int length, token current)
+void block(token current)
 {
   if (current.type == constsym)
   {
     while (current.type != commasym)
     {
-      getToken();
+      getToken(current);
       if (current.type != identsym)
         findError(4);
       if (current.type != eqlsym)
@@ -665,53 +669,116 @@ void block(lexeme list[], int length, token current)
     }
     if (current.type != semicolonsym)
       findError(5);
-    getToken();
+    getToken(current);
   }
   if (current.type = varsym) // ???
   {
     while (current.type != commasym)
     {
-      getToken();
+      getToken(current);
       if (current.type != identsym)
         findError(4);
-      getToken();
+      getToken(current);
     }
     if (current.type != semicolonsym)
       findError(5);
-    getToken();
+    getToken(current);
   }
   while (current.type == procsym)
   {
-    getToken();
+    getToken(current);
     if (current.type != identsym)
       findError(4); // maybee???????
-    getToken();
+    getToken(current);
     if (current.type != semicolonsym)
       findError(5);
-    getToken();
+    getToken(current);
   }
   while (current.type == procsym)
   {
-    getToken();
+    getToken(current);
     if (current.type != identsym)
       findError(4); // ???
-    getToken();
+    getToken(current);
     if (current.type != semicolonsym)
       findError(5);
-    getToken();
+    getToken(current);
 
-    block(list, length, current);
+    block(current);
 
     if (current.type != semicolonsym)
       findError(5);
-    getToken();
+    getToken(current);
   }
-  statement(list, length, current);
+  statement(current);
 }
 
-void statement(lexeme list[], int length, token current)
+void statement(token current)
 {
 
+}
+
+void condition(token current)
+{
+  if (current.type == oddsym)
+  {
+    getToken(current);
+    expression(current);
+  }
+  else
+  {
+    expression(current);
+    if (current.type != eqlsym && current.type != neqsym && current.type != lessym
+        && current.type != leqsym && current.type != gtrsym && current.type != geqsym)
+        findError(20);
+    getToken(current);
+    expression(current);
+  }
+}
+
+void expression(token current)
+{
+  if (current.type == plussym || current.type == minussym)
+  {
+    getToken(current);
+    term(current);
+  }
+}
+
+void term(token current)
+{
+  factor(current);
+  while (current.type == multsym || current.type == slashsym)
+  {
+    getToken(current);
+    factor(current);
+  }
+}
+
+void factor(token current)
+{
+  if (current.type == identsym)
+  {
+    getToken(current);
+  }
+  else if (current.type == numbersym)
+  {
+    getToken(current);
+  }
+  else if (current.type == lparentsym)
+  {
+    getToken(current);
+    expression(current);
+    if (current.type != rparentsym)
+    {
+      findError(22);
+      getToken(current);
+    }
+  }
+  else
+  {
+    findError(23); // ???
+  }
 }
 
 int main(int argc, char **argv)
@@ -757,10 +824,9 @@ int main(int argc, char **argv)
   count = parse(code, list, fplex);
   // Printing output that represents the lexeme array
   output(list, count, fplex);
-  block(list, count, current);
+  block(current);
 
   fclose(fpin);
   fclose(fplex);
   return 0;
 }
-
