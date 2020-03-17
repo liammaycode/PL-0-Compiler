@@ -527,6 +527,22 @@ void getToken(token current)
   // {
   //   strcpy(current.value, list[index + 1].lexeme);
   // }
+	if( fscanf( fpin, "%s", currrent.type ) != EOF ){
+
+    //If token is identsym or numbersym, get token value.
+    if( !strcmp(current.type, "2") || !strcmp(current.type, "3") )
+      fscanf( fpin, "%s", current.value );
+
+    //All other tokens.
+    else current.value[0] = '\0';
+
+    //Debugging Statement:
+    //printf("Token: Type: %s, Value: %s .\n", curr_token.type, curr_token.value);
+
+    //Successful token fetch.
+    return 1;
+	
+
 }
 
 void findError(int errorNum)
