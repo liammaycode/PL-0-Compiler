@@ -527,22 +527,6 @@ void getToken(token current)
   // {
   //   strcpy(current.value, list[index + 1].lexeme);
   // }
-	if( fscanf( fpin, "%s", currrent.type ) != EOF ){
-
-    //If token is identsym or numbersym, get token value.
-    if( !strcmp(current.type, "2") || !strcmp(current.type, "3") )
-      fscanf( fpin, "%s", current.value );
-
-    //All other tokens.
-    else current.value[0] = '\0';
-
-    //Debugging Statement:
-    //printf("Token: Type: %s, Value: %s .\n", curr_token.type, curr_token.value);
-
-    //Successful token fetch.
-    return 1;
-	
-
 }
 
 void findError(int errorNum)
@@ -729,68 +713,68 @@ void block(token current)
   statement(current);
 }
 
-void program(lexeme list[], int length, token current)
+void program(token current)
 {
-  getToken();
-  block();
+  getToken(current);
+  block(current);
   if(current.type != periodsym)
   {
   findError(9);
   }
 }
 
-void statement(lexeme list[], int length, token current)
+void statement(token current)
 {
   if(current.type == identsym)
   {
-    getToken();
+    getToken(current);
     if(current.type != becomessym)
       findError(6); // ??????????
-    getToken();
-    expression();
+    getToken(current);
+    expression(current);
   }
   else if(current.type == callsym )
   {
-    getToken();
+    getToken(current);
     if(current.type != identsym)
     findError(4);
-    getToken();
+    getToken(current);
   }
   else if(current.type == beginsym)
   {
-    getToken();
-    statement();
+    getToken(current);
+    statement(current);
     while(current.type == semicolonsym)
     {
-      getToken();
-      statement();
+      getToken(current);
+      statement(current);
     }
     if(current.type != endsym)
     {
       findError(5);
     }
-    getToken();
+    getToken(current);
   }
-  
+
   else if(current.type == ifsym)
   {
-    getToken();
-    condition();
+    getToken(current);
+    condition(current);
     if(current.type != thensym)
     findError(16);
-    statement();
+    statement(current);
   }
   else if(current.type ==whilesym)
   {
-    getToken();
-    condition();
+    getToken(current);
+    condition(current);
     if(current.type != dosym)
     {
-    getToken();
-    statement();
+    getToken(current);
+    statement(current);
     }
   }
-  
+
 }
 
 void condition(token current)
