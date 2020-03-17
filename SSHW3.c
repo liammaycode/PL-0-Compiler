@@ -107,7 +107,9 @@ int parse(char *code, lexeme list[], FILE *fplex)
   char buffer[MAX_CODE_LENGTH];
   token_type t;
 
+  printf("\nMade it to parse\n");
   // looping through string containing input
+  printf("\nlooping through string containing input\n");
   while (code[lp] != '\0')
   {
     // ignoring whitespace
@@ -253,6 +255,7 @@ int parse(char *code, lexeme list[], FILE *fplex)
       lp++;
     }
   }
+  printf("\nFinishing parse\n");
   return listIndex;
 }
 
@@ -871,6 +874,7 @@ int main(int argc, char **argv)
   }
 
   // Scanning file into code array
+  printf("\nScanning file into code array\n");
   while(!feof(fpin))
   {
     fgets(aSingleLine, MAX_CODE_LENGTH, fpin);
@@ -878,8 +882,10 @@ int main(int argc, char **argv)
   }
 
   // Removing all comments from code
+  printf("\nRemoving all comments from code\n");
   strcpy(code, trim(code, trimmed));
   // Filling lexeme array and capturing number of elements of lexeme array
+  printf("\nFilling lexeme array and capturing number of elements of lexeme array\n");
   count = parse(code, list, fplex);
   // Printing output that represents the lexeme array
   output(list, count, fplex);
