@@ -713,9 +713,68 @@ void block(token current)
   statement(current);
 }
 
-void statement(token current)
+void program(lexeme list[], int length, token current)
 {
+  getToken();
+  block();
+  if(current.type != periodsym)
+  {
+  findError(9);
+  }
+}
 
+void statement(lexeme list[], int length, token current)
+{
+  if(current.type == identsym)
+  {
+    getToken();
+    if(current.type != becomessym)
+      findError(6); // ??????????
+    getToken();
+    expression();
+  }
+  else if(current.type == callsym )
+  {
+    getToken();
+    if(current.type != identsym)
+    findError(4);
+    getToken();
+  }
+  else if(current.type == beginsym)
+  {
+    getToken();
+    statement();
+    while(current.type == semicolonsym)
+    {
+      getToken();
+      statement();
+    }
+    if(current.type != endsym)
+    {
+      findError(5);
+    }
+    getToken();
+  }
+  
+  else if(current.type == ifsym)
+  {
+    getToken();
+    condition();
+    if(current.type != thensym)
+    findError(16);
+    statement();
+  }
+  else if(current.type ==whilesym)
+  {
+    getToken();
+    condition();
+    if(current.type != dosym)
+    {
+    getToken();
+    statement();
+    }
+  }
+  
 }
 
 void condition(token current)
