@@ -57,12 +57,16 @@ lexeme *createLexeme(token_type t, char *str);
 bool isNumber(char *str);
 bool isSymbol(char symbol);
 void output(lexeme list[], int count, FILE *fplex);
-void statement(lexeme list[], int length, token current);
+void block(token current);
+void statement(token current);
+void condition(token current);
+void expression(token current);
+void term(token current);
+void factor(token current);
 
 lexeme *createLexeme(token_type t, char *str)
 {
-	// calloc() initializes the 'left' and 'right' pointers to NULL for us.
-	lexeme *l;
+	lexeme *l = malloc(1 * sizeof(lexeme));
 	l->type = t;
   l->lexeme = malloc(sizeof(char) * MAX_IDENT_LENGTH);
   strcpy(l->lexeme, str);
@@ -102,7 +106,9 @@ int parse(char *code, lexeme list[], FILE *fplex)
   char buffer[MAX_CODE_LENGTH];
   token_type t;
 
+  printf("\nMade it to parse\n");
   // looping through string containing input
+  printf("\nlooping through string containing input\n");
   while (code[lp] != '\0')
   {
     // ignoring whitespace
@@ -110,11 +116,13 @@ int parse(char *code, lexeme list[], FILE *fplex)
     {
       lp++;
     }
+    // printf("%c\n", code[lp]);
     if (isalpha(code[lp]))
     {
       rp = lp;
 
       // capturing length of substring
+      printf("capturing length of substring\n");
       while (isalpha(code[rp]) || isdigit(code[rp]))
       {
         rp++;
@@ -122,6 +130,7 @@ int parse(char *code, lexeme list[], FILE *fplex)
       length = rp - lp;
 
       // checking for ident length error
+      printf("checking for ident length error\n");
       if (length > MAX_IDENT_LENGTH)
       {
         fprintf(fplex, "Err: ident length too long\n");
@@ -129,6 +138,7 @@ int parse(char *code, lexeme list[], FILE *fplex)
       }
 
       // creating substring
+      printf("creating substring\n");
       for (i = 0; i < length; i++)
       {
         buffer[i] = code[lp + i];
@@ -137,16 +147,21 @@ int parse(char *code, lexeme list[], FILE *fplex)
       lp = rp;
 
       // adds reserved words to lexeme array
+      printf("adds reserved words to lexeme array\n");
       if (isReserved(buffer))
       {
         t = reserved(buffer);
-        lexptr = createLexeme(t, buffer);
+        printf("155\n");
+        lexptr = createLexeme(t, buffer); // segfault??
+        printf("157\n");
         list[listIndex++] = *lexptr;
       }
       // must be a identifier at this line
+      // printf("must be a identifier at this line\n");
       else
       {
         t = identsym;
+        printf("164\n");
         lexptr = createLexeme(t, buffer);
         list[listIndex++] = *lexptr;
       }
@@ -157,6 +172,7 @@ int parse(char *code, lexeme list[], FILE *fplex)
 
       i = 0;
       // capturing length of substring
+      printf("capturing length of substring\n");
       while (isdigit(code[lp + i]))
       {
         rp++;
@@ -248,6 +264,7 @@ int parse(char *code, lexeme list[], FILE *fplex)
       lp++;
     }
   }
+  printf("\nFinished parse\n");
   return listIndex;
 }
 
@@ -510,7 +527,7 @@ void output(lexeme list[], int count, FILE *fplex)
 
 // Places the token from the index of the lexeme list and assigns it to current
 // token
-void getToken()
+void getToken(token current)
 {
   // int i = 0;
   //
@@ -631,95 +648,30 @@ void findError(int errorNum)
 
       default:
       printf("Invalid instruction");
-
     }
 }
 
 void insertSymbols(int counter, symbol symbol_table[], int kind, char name[], int val, int level, int addr)
 {
-    //filling in the symbol tables with current data
-    //note: counter needs to be set to zero in main
-    symbol_table[counter].kind = kind;
-    //capture name string and insert it into symbol table as a string
-    strcpy(symbol_table[counter].name, name);
-    symbol_table[counter].val = val;
-    symbol_table[counter].level = level;
-    symbol_table[counter].addr = addr;
+  //filling in the symbol tables with current data
+  //note: counter needs to be set to zero in main
+  symbol_table[counter].kind = kind;
+  //capture name string and insert it into symbol table as a string
+  strcpy(symbol_table[counter].name, name);
+  symbol_table[counter].val = val;
+  symbol_table[counter].level = level;
+  symbol_table[counter].addr = addr;
 
-    counter++;
+  counter++;
 }
 
-void program(lexeme list[], int length, token current)
-{
-  getToken();
-  block();
-  if(current.type != periodsym)
-  {
-  findError(9);
-  }
-}
-
-void statement(lexeme list[], int length, token current)
-{
-  if(current.type == identsym)
-  {
-    getToken();
-    if(current.type != becomessym)
-      findError(6); // ??????????
-    getToken();
-    expression();
-  }
-  else if(current.type == callsym )
-  {
-    getToken();
-    if(current.type != identsym)
-    findError(4);
-    getToken();
-  }
-  else if(current.type == beginsym)
-  {
-    getToken();
-    statement();
-    while(current.type == semicolonsym)
-    {
-      getToken();
-      statement();
-    }
-    if(current.type != endsym)
-    {
-      findError(5);
-    }
-    getToken();
-  }
-  
-  else if(current.type == ifsym)
-  {
-    getToken();
-    condition();
-    if(current.type != thensym)
-    	findError(16);
-    statement();
-  }
-  else if(current.type ==whilesym)
-  {
-    getToken();
-    condition();
-    if(current.type != dosym)
-    {
-   	getToken();
-    	statement();
-    }
-  }
-  
-}
-
-void block(lexeme list[], int length, token current)
+void block(token current)
 {
   if (current.type == constsym)
   {
     while (current.type != commasym)
     {
-      getToken();
+      getToken(current);
       if (current.type != identsym)
         findError(4);
       if (current.type != eqlsym)
@@ -729,53 +681,175 @@ void block(lexeme list[], int length, token current)
     }
     if (current.type != semicolonsym)
       findError(5);
-    getToken();
+    getToken(current);
   }
   if (current.type = varsym) // ???
   {
     while (current.type != commasym)
     {
-      getToken();
+      getToken(current);
       if (current.type != identsym)
         findError(4);
-      getToken();
+      getToken(current);
     }
     if (current.type != semicolonsym)
       findError(5);
-    getToken();
+    getToken(current);
   }
   while (current.type == procsym)
   {
-    getToken();
+    getToken(current);
     if (current.type != identsym)
       findError(4); // maybee???????
-    getToken();
+    getToken(current);
     if (current.type != semicolonsym)
       findError(5);
-    getToken();
+    getToken(current);
   }
   while (current.type == procsym)
   {
-    getToken();
+    getToken(current);
     if (current.type != identsym)
       findError(4); // ???
-    getToken();
+    getToken(current);
     if (current.type != semicolonsym)
       findError(5);
-    getToken();
+    getToken(current);
 
-    block(list, length, current);
+    block(current);
 
     if (current.type != semicolonsym)
       findError(5);
-    getToken();
+    getToken(current);
   }
-  statement(list, length, current);
+  statement(current);
 }
 
-void statement(lexeme list[], int length, token current)
+void program(token current)
 {
+  getToken(current);
+  block(current);
+  if(current.type != periodsym)
+  {
+  findError(9);
+  }
+}
 
+void statement(token current)
+{
+  if(current.type == identsym)
+  {
+    getToken(current);
+    if(current.type != becomessym)
+      findError(6); // ??????????
+    getToken(current);
+    expression(current);
+  }
+  else if(current.type == callsym )
+  {
+    getToken(current);
+    if(current.type != identsym)
+    findError(4);
+    getToken(current);
+  }
+  else if(current.type == beginsym)
+  {
+    getToken(current);
+    statement(current);
+    while(current.type == semicolonsym)
+    {
+      getToken(current);
+      statement(current);
+    }
+    if(current.type != endsym)
+    {
+      findError(5);
+    }
+    getToken(current);
+  }
+
+  else if(current.type == ifsym)
+  {
+    getToken(current);
+    condition(current);
+    if(current.type != thensym)
+    findError(16);
+    statement(current);
+  }
+  else if(current.type ==whilesym)
+  {
+    getToken(current);
+    condition(current);
+    if(current.type != dosym)
+    {
+    getToken(current);
+    statement(current);
+    }
+  }
+
+}
+
+void condition(token current)
+{
+  if (current.type == oddsym)
+  {
+    getToken(current);
+    expression(current);
+  }
+  else
+  {
+    expression(current);
+    if (current.type != eqlsym && current.type != neqsym && current.type != lessym
+        && current.type != leqsym && current.type != gtrsym && current.type != geqsym)
+        findError(20);
+    getToken(current);
+    expression(current);
+  }
+}
+
+void expression(token current)
+{
+  if (current.type == plussym || current.type == minussym)
+  {
+    getToken(current);
+    term(current);
+  }
+}
+
+void term(token current)
+{
+  factor(current);
+  while (current.type == multsym || current.type == slashsym)
+  {
+    getToken(current);
+    factor(current);
+  }
+}
+
+void factor(token current)
+{
+  if (current.type == identsym)
+  {
+    getToken(current);
+  }
+  else if (current.type == numbersym)
+  {
+    getToken(current);
+  }
+  else if (current.type == lparentsym)
+  {
+    getToken(current);
+    expression(current);
+    if (current.type != rparentsym)
+    {
+      findError(22);
+      getToken(current);
+    }
+  }
+  else
+  {
+    findError(23); // ???
+  }
 }
 
 int main(int argc, char **argv)
@@ -809,6 +883,7 @@ int main(int argc, char **argv)
   }
 
   // Scanning file into code array
+  printf("\nScanning file into code array\n");
   while(!feof(fpin))
   {
     fgets(aSingleLine, MAX_CODE_LENGTH, fpin);
@@ -816,12 +891,14 @@ int main(int argc, char **argv)
   }
 
   // Removing all comments from code
+  printf("\nRemoving all comments from code\n");
   strcpy(code, trim(code, trimmed));
   // Filling lexeme array and capturing number of elements of lexeme array
+  printf("\nFilling lexeme array and capturing number of elements of lexeme array\n");
   count = parse(code, list, fplex);
   // Printing output that represents the lexeme array
   output(list, count, fplex);
-  block(list, count, current);
+  block(current);
 
   fclose(fpin);
   fclose(fplex);
