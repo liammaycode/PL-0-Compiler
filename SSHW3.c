@@ -1,4 +1,4 @@
-// Michael Said
+/ Michael Said
 // Liam May
 // COP 3402
 // Spring 2020
@@ -59,7 +59,7 @@ token_type reserved(char *str);
 lexeme *createLexeme(token_type t, char *str);
 bool isNumber(char *str);
 bool isSymbol(char symbol);
-void output(lexeme list[], int count, FILE *fplex);
+void output(lexeme list[], int count, FILE *fplex, bool l, bool a, bool v);
 int block(token current);
 int statement(token current);
 int condition(token current);
@@ -101,7 +101,8 @@ char* trim(char *str, char *trimmed)
 }
 
 // Parses words from the code to be evaluated, adds them to the lexeme array,
-// and returns the number of lexemes that were added to the array
+// and returns the number of lexemes that were added to the array or 0 if there
+// was an error
 int parse(char *code, lexeme list[], FILE *fplex)
 {
   lexeme *lexptr;
@@ -130,7 +131,6 @@ int parse(char *code, lexeme list[], FILE *fplex)
       length = rp - lp;
 
       // checking for ident length error
-
       if (length > MAX_IDENT_LENGTH)
       {
         fprintf(fplex, "Err: ident length too long\n");
@@ -138,7 +138,6 @@ int parse(char *code, lexeme list[], FILE *fplex)
       }
 
       // creating substring
-
       for (i = 0; i < length; i++)
       {
         buffer[i] = code[lp + i];
@@ -147,7 +146,6 @@ int parse(char *code, lexeme list[], FILE *fplex)
       lp = rp;
 
       // adds reserved words to lexeme array
-
       if (isReserved(buffer))
       {
         t = reserved(buffer);
@@ -169,7 +167,6 @@ int parse(char *code, lexeme list[], FILE *fplex)
 
       i = 0;
       // capturing length of substring
-
       while (isdigit(code[lp + i]))
       {
         rp++;
@@ -516,25 +513,32 @@ token_type reserved(char *str)
 }
 
 // Prints leveme list to output file
-void output(lexeme list[], int count, FILE *fplex)
+void output(lexeme list[], int count, FILE *fplex, bool l, bool a, bool v)
 {
   int i = 0;
-  // fprintf(fplex, "Lexeme Table:\nLexeme\t\tToken Type\n");
-  // for (i = 0; i < count; i++)
-  // {
-  //   fprintf(fplex, "%s\t\t%d\n", list[i].lexeme, list[i].type);
-  // }
 
-  // fprintf(fplex, "Lexeme List:\n");
-  for(i = 0; i < count; i++)
+  if (l == false && a == false && v == false)
   {
-    fprintf(fplex, "%d ", list[i].type);
-    if(list[i].type == 2 || list[i].type == 3)
+    fprintf(fplex, "in\tout\n");
+    return;
+  }
+  if (l == true && a == false && v == false)
+  {
+    fprintf(fplex, "List of lexemes/tokens:\n\n");
+    for (i = 0; i < count; i++)
     {
-      fprintf(fplex, "%s ", list[i].lexeme);
+      fprintf(fplex, "%s", list[i].lexeme);
+      (i % 10 == 0) ? fprintf(fplex, "\n") : fprintf(fplex, "\t");
+    }
+    fprintf(fplex, "Symbolic representation:\n\n");
+    for (i = 0; i < count; i++)
+    {
+      fprintf(fplex, "%s", list[i].type);
+      (i % 10 == 0) ? fprintf(fplex, "\n") : fprintf(fplex, "\t");
     }
   }
-  fprintf(fplex, "\n");
+
+  fprintf(fplex, "No errors, program is syntactically correct\n\n");
 }
 
 // Places the token from the index of the lexeme list and assigns it to current
@@ -951,17 +955,42 @@ int main(int argc, char **argv)
   fpin = fopen(argv[1], "r");
   fplex = fopen(argv[2], "w+");
   char aSingleLine[MAX_CODE_LENGTH], code[MAX_CODE_LENGTH] = {'\0'},
-       trimmed[MAX_CODE_LENGTH] = {'\0'};
+       trimmed[MAX_CODE_LENGTH] = {'\0'}, commands[3][3];
   lexeme list[MAX_CODE_LENGTH] = {'\0'};
   int count, i, tokens[MAX_SYMBOL_TABLE_SIZE] = {'\0'};
   symbol symbol_table[MAX_SYMBOL_TABLE_SIZE];
   token current;
+  bool l = false, a = false, v = false;
 
   // output for user that makes error entering command line arguments
-  if (argc < 3)
+  if (argc < 3 || argc > 6)
   {
-    printf("Err: incorrect program call\nSyntax: ./a.out <inputfilename> <outputfilename>\n");
     return 0;
+  }
+  if (argc == 4)
+  {
+    strcpy(commands[0], argv[3]);
+  }
+  if (argc == 5)
+  {
+    strcpy(commands[0], argv[3]);
+    strcpy(commands[1], argv[4]);
+  }
+  if (argc == 6)
+  {
+    strcpy(commands[0], argv[3]);
+    strcpy(commands[1], argv[4]);
+    strcpy(commands[2], argv[5]);
+  }
+
+  for (i = 0; i < (argc - 3); i++)
+  {
+    if (strcmp(commands[i], "-l") == 0)
+      l = true;
+    if (strcmp(commands[i], "-a") == 0)
+      a = true;
+    if (strcmp(commands[i], "-v") == 0)
+      v = true;
   }
   // Preventing file errors by checking for failures to open files
   if (fpin == NULL)
@@ -976,7 +1005,6 @@ int main(int argc, char **argv)
   }
 
   // Scanning file into code array
-
   while(!feof(fpin))
   {
     fgets(aSingleLine, MAX_CODE_LENGTH, fpin);
@@ -984,18 +1012,22 @@ int main(int argc, char **argv)
   }
 
   // Removing all comments from code
-
   strcpy(code, trim(code, trimmed));
   // Filling lexeme array and capturing number of elements of lexeme array
-
   count = parse(code, list, fplex);
+  if (count == 0)
+    return 0;
+
   // Printing output that represents the lexeme array
-  output(list, count, fplex); // <- change so that this line only executes if parse is successful
+  if (argc > 3)
+  {
+    output(list, count, fplex, l, a, v); // <- change so that this line only executes if parse is successful
+  }
   block(current);
+
+  // run program on VM
 
   fclose(fpin);
   fclose(fplex);
   return 0;
 }
-
-
