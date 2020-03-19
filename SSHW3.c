@@ -18,6 +18,8 @@
 #define MAX_CODE_LENGTH 550
 #define MAX_SYMBOL_TABLE_SIZE 500
 
+FILE *fpin, *fplex;
+
 typedef enum
 {
   nulsym = 1, identsym = 2, numbersym = 3, plussym = 4, minussym = 5, multsym = 6,
@@ -49,6 +51,7 @@ typedef struct
   char value[12];
 }token;
 
+
 char* trim(char *str, char *trimmed);
 int parse(char *code, lexeme list[], FILE *fplex);
 bool isReserved(char *str);
@@ -57,17 +60,16 @@ lexeme *createLexeme(token_type t, char *str);
 bool isNumber(char *str);
 bool isSymbol(char symbol);
 void output(lexeme list[], int count, FILE *fplex);
-void block(token current);
-void statement(token current);
-void condition(token current);
+int block(token current);
+int statement(token current);
+int condition(token current);
 void expression(token current);
 void term(token current);
-void factor(token current);
+int factor(token current);
 
 lexeme *createLexeme(token_type t, char *str)
 {
-	// calloc() initializes the 'left' and 'right' pointers to NULL for us.
-	lexeme *l;
+	lexeme *l = malloc(1 * sizeof(lexeme));
 	l->type = t;
   l->lexeme = malloc(sizeof(char) * MAX_IDENT_LENGTH);
   strcpy(l->lexeme, str);
@@ -117,11 +119,13 @@ int parse(char *code, lexeme list[], FILE *fplex)
     {
       lp++;
     }
+    // printf("%c\n", code[lp]);
     if (isalpha(code[lp]))
     {
       rp = lp;
 
       // capturing length of substring
+      printf("capturing length of substring\n");
       while (isalpha(code[rp]) || isdigit(code[rp]))
       {
         rp++;
@@ -129,6 +133,7 @@ int parse(char *code, lexeme list[], FILE *fplex)
       length = rp - lp;
 
       // checking for ident length error
+      printf("checking for ident length error\n");
       if (length > MAX_IDENT_LENGTH)
       {
         fprintf(fplex, "Err: ident length too long\n");
@@ -136,6 +141,7 @@ int parse(char *code, lexeme list[], FILE *fplex)
       }
 
       // creating substring
+      printf("creating substring\n");
       for (i = 0; i < length; i++)
       {
         buffer[i] = code[lp + i];
@@ -144,16 +150,21 @@ int parse(char *code, lexeme list[], FILE *fplex)
       lp = rp;
 
       // adds reserved words to lexeme array
+      printf("adds reserved words to lexeme array\n");
       if (isReserved(buffer))
       {
         t = reserved(buffer);
-        lexptr = createLexeme(t, buffer);
+        printf("155\n");
+        lexptr = createLexeme(t, buffer); // segfault??
+        printf("157\n");
         list[listIndex++] = *lexptr;
       }
       // must be a identifier at this line
+      // printf("must be a identifier at this line\n");
       else
       {
         t = identsym;
+        printf("164\n");
         lexptr = createLexeme(t, buffer);
         list[listIndex++] = *lexptr;
       }
@@ -164,6 +175,7 @@ int parse(char *code, lexeme list[], FILE *fplex)
 
       i = 0;
       // capturing length of substring
+      printf("capturing length of substring\n");
       while (isdigit(code[lp + i]))
       {
         rp++;
@@ -255,7 +267,7 @@ int parse(char *code, lexeme list[], FILE *fplex)
       lp++;
     }
   }
-  printf("\nFinishing parse\n");
+  printf("\nFinished parse\n");
   return listIndex;
 }
 
@@ -520,16 +532,19 @@ void output(lexeme list[], int count, FILE *fplex)
 // token
 void getToken(token current)
 {
-  // int i = 0;
-  //
-  // // Assigning lexeme token at index to current
-  // current.type = list[index].type;
-  //
-  // // If token type is identsym or numbersym, assigning value to next index of array
-  // if (current.type == 2 || current.type == 3)
-  // {
-  //   strcpy(current.value, list[index + 1].lexeme);
-  // }
+  char buffer[MAX_CODE_LENGTH];
+  if (fscanf(fplex, "%s", buffer) != EOF)
+  {
+    if (strcmp(buffer, "2") == 0 || strcmp(buffer, "3") == 0)
+    {
+      fscanf(fplex, "%s", buffer);
+    }
+    else
+    {
+      current.value[0] = '\0';
+    }
+    strcpy(current.value, buffer);
+  }
 }
 
 void findError(int errorNum)
@@ -656,7 +671,7 @@ void insertSymbols(int counter, symbol symbol_table[], int kind, char name[], in
   counter++;
 }
 
-void block(token current)
+int block(token current)
 {
   if (current.type == constsym)
   {
@@ -664,14 +679,26 @@ void block(token current)
     {
       getToken(current);
       if (current.type != identsym)
+      {
         findError(4);
+        return 0;
+      }
       if (current.type != eqlsym)
+      {
         findError(3);
+        return 0;
+      }
       if (current.type != numbersym)
+      {
         findError(2);
+        return 0;
+      }
     }
     if (current.type != semicolonsym)
+    {
       findError(5);
+      return 0;
+    }
     getToken(current);
   }
   if (current.type = varsym) // ???
@@ -680,59 +707,88 @@ void block(token current)
     {
       getToken(current);
       if (current.type != identsym)
+      {
         findError(4);
+        return 0;
+      }
       getToken(current);
     }
     if (current.type != semicolonsym)
+    {
       findError(5);
+      return 0;
+    }
     getToken(current);
   }
   while (current.type == procsym)
   {
     getToken(current);
     if (current.type != identsym)
+    {
       findError(4); // maybee???????
+      return 0;
+    }
     getToken(current);
     if (current.type != semicolonsym)
+    {
       findError(5);
+      return 0;
+    }
     getToken(current);
   }
   while (current.type == procsym)
   {
     getToken(current);
     if (current.type != identsym)
+    {
       findError(4); // ???
+      return 0;
+    }
     getToken(current);
     if (current.type != semicolonsym)
+    {
       findError(5);
+      return 0;
+    }
     getToken(current);
-
     block(current);
 
     if (current.type != semicolonsym)
+    {
       findError(5);
+      return 0;
+    }
     getToken(current);
   }
-  statement(current);
+  if (statement(current) == 0)
+    return 0;
+
+  return 1;
 }
 
-void program(token current)
+int program(token current)
 {
   getToken(current);
-  block(current);
+  if (block(current) == 0)
+    return 0;
   if(current.type != periodsym)
   {
-  findError(9);
+    findError(9);
+    return 0;
   }
+  return 1;
 }
 
-void statement(token current)
+int statement(token current)
 {
   if(current.type == identsym)
   {
     getToken(current);
     if(current.type != becomessym)
+    {
       findError(6); // ??????????
+      return 0;
+    }
     getToken(current);
     expression(current);
   }
@@ -740,21 +796,31 @@ void statement(token current)
   {
     getToken(current);
     if(current.type != identsym)
-    findError(4);
+    {
+      findError(4);
+      return 0;
+    }
     getToken(current);
   }
   else if(current.type == beginsym)
   {
     getToken(current);
-    statement(current);
+    if (statement(current) == 0)
+    {
+      return 0;
+    }
     while(current.type == semicolonsym)
     {
       getToken(current);
-      statement(current);
+      if (statement(current) == 0)
+      {
+        return 0;
+      }
     }
     if(current.type != endsym)
     {
       findError(5);
+      return 0;
     }
     getToken(current);
   }
@@ -762,25 +828,40 @@ void statement(token current)
   else if(current.type == ifsym)
   {
     getToken(current);
-    condition(current);
-    if(current.type != thensym)
-    findError(16);
-    statement(current);
-  }
-  else if(current.type ==whilesym)
-  {
-    getToken(current);
-    condition(current);
-    if(current.type != dosym)
+    if (condition(current) == 0)
     {
-    getToken(current);
-    statement(current);
+      return 0;
+    }
+    if(current.type != thensym)
+    {
+      findError(16);
+      return 0;
+    }
+    if (statement(current) == 0)
+    {
+      return 0;
     }
   }
-
+  else if(current.type == whilesym)
+  {
+    getToken(current);
+    if (condition(current) == 0)
+    {
+      return 0;
+    }
+    if(current.type != dosym)
+    {
+      getToken(current);
+      if (statement(current) == 0)
+      {
+        return 0;
+      }
+    }
+  }
+  return 1;
 }
 
-void condition(token current)
+int condition(token current)
 {
   if (current.type == oddsym)
   {
@@ -792,10 +873,14 @@ void condition(token current)
     expression(current);
     if (current.type != eqlsym && current.type != neqsym && current.type != lessym
         && current.type != leqsym && current.type != gtrsym && current.type != geqsym)
-        findError(20);
+    {
+      findError(20);
+      return 0;
+    }
     getToken(current);
     expression(current);
   }
+  return 1;
 }
 
 void expression(token current)
@@ -809,15 +894,21 @@ void expression(token current)
 
 void term(token current)
 {
-  factor(current);
+  if (factor(current) == 0)
+  {
+    return;
+  }
   while (current.type == multsym || current.type == slashsym)
   {
     getToken(current);
-    factor(current);
+    if (factor(current) == 0)
+    {
+      return;
+    }
   }
 }
 
-void factor(token current)
+int factor(token current)
 {
   if (current.type == identsym)
   {
@@ -834,20 +925,22 @@ void factor(token current)
     if (current.type != rparentsym)
     {
       findError(22);
-      getToken(current);
+      return 0;
     }
+    getToken(current);
   }
   else
   {
     findError(23); // ???
+    return 0;
   }
+  return 1;
 }
 
 int main(int argc, char **argv)
 {
-  FILE *fpin, *fplex;
   fpin = fopen(argv[1], "r");
-  fplex = fopen(argv[2], "r+");
+  fplex = fopen(argv[2], "w+");
   char aSingleLine[MAX_CODE_LENGTH], code[MAX_CODE_LENGTH] = {'\0'},
        trimmed[MAX_CODE_LENGTH] = {'\0'};
   lexeme list[MAX_CODE_LENGTH] = {'\0'};
@@ -888,10 +981,11 @@ int main(int argc, char **argv)
   printf("\nFilling lexeme array and capturing number of elements of lexeme array\n");
   count = parse(code, list, fplex);
   // Printing output that represents the lexeme array
-  output(list, count, fplex);
+  output(list, count, fplex); // <- change so that this line only executes if parse is successful
   block(current);
 
   fclose(fpin);
   fclose(fplex);
   return 0;
 }
+
