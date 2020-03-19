@@ -204,7 +204,7 @@ int parse(char *code, lexeme list[], FILE *fplex)
     }
 
     // Creating a lexeme for the symbol
-    else if (isSymbol(code[lp]))
+     else if (isSymbol(code[lp]))
     {
       if (code[lp] == '+')
       {
@@ -245,10 +245,22 @@ int parse(char *code, lexeme list[], FILE *fplex)
       if (code[lp] == '<')
       {
         t = 11;
+        if(code[lp+1] == '=')
+        {
+          t=12;
+        }
+        if(code[lp+1] == '>')
+        {
+          t=10;
+        }
       }
       if (code[lp] == '>')
       {
         t = 13;
+        if(code[lp+1] == '=')
+        {
+          t= 13;
+        }
       }
       if (code[lp] == ';')
       {
@@ -257,6 +269,10 @@ int parse(char *code, lexeme list[], FILE *fplex)
       if (code[lp] == ':')
       {
         t = 20;
+        if(code[lp+1] == '=')
+        {
+          t=9;
+        }
       }
 
       buffer[0] = code[lp];
@@ -267,7 +283,7 @@ int parse(char *code, lexeme list[], FILE *fplex)
       lp++;
     }
   }
-  printf("\nFinished parse\n");
+  printf("\nFinishing parse\n");
   return listIndex;
 }
 
