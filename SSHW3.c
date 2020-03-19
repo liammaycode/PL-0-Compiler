@@ -109,9 +109,7 @@ int parse(char *code, lexeme list[], FILE *fplex)
   char buffer[MAX_CODE_LENGTH];
   token_type t;
 
-  printf("\nMade it to parse\n");
   // looping through string containing input
-  printf("\nlooping through string containing input\n");
   while (code[lp] != '\0')
   {
     // ignoring whitespace
@@ -125,7 +123,6 @@ int parse(char *code, lexeme list[], FILE *fplex)
       rp = lp;
 
       // capturing length of substring
-      printf("capturing length of substring\n");
       while (isalpha(code[rp]) || isdigit(code[rp]))
       {
         rp++;
@@ -133,7 +130,7 @@ int parse(char *code, lexeme list[], FILE *fplex)
       length = rp - lp;
 
       // checking for ident length error
-      printf("checking for ident length error\n");
+
       if (length > MAX_IDENT_LENGTH)
       {
         fprintf(fplex, "Err: ident length too long\n");
@@ -141,7 +138,7 @@ int parse(char *code, lexeme list[], FILE *fplex)
       }
 
       // creating substring
-      printf("creating substring\n");
+
       for (i = 0; i < length; i++)
       {
         buffer[i] = code[lp + i];
@@ -150,13 +147,11 @@ int parse(char *code, lexeme list[], FILE *fplex)
       lp = rp;
 
       // adds reserved words to lexeme array
-      printf("adds reserved words to lexeme array\n");
+
       if (isReserved(buffer))
       {
         t = reserved(buffer);
-        printf("155\n");
         lexptr = createLexeme(t, buffer); // segfault??
-        printf("157\n");
         list[listIndex++] = *lexptr;
       }
       // must be a identifier at this line
@@ -164,7 +159,6 @@ int parse(char *code, lexeme list[], FILE *fplex)
       else
       {
         t = identsym;
-        printf("164\n");
         lexptr = createLexeme(t, buffer);
         list[listIndex++] = *lexptr;
       }
@@ -175,7 +169,7 @@ int parse(char *code, lexeme list[], FILE *fplex)
 
       i = 0;
       // capturing length of substring
-      printf("capturing length of substring\n");
+
       while (isdigit(code[lp + i]))
       {
         rp++;
@@ -204,7 +198,7 @@ int parse(char *code, lexeme list[], FILE *fplex)
     }
 
     // Creating a lexeme for the symbol
-    else if (isSymbol(code[lp]))
+     else if (isSymbol(code[lp]))
     {
       if (code[lp] == '+')
       {
@@ -245,10 +239,22 @@ int parse(char *code, lexeme list[], FILE *fplex)
       if (code[lp] == '<')
       {
         t = 11;
+        if(code[lp+1] == '=')
+        {
+          t=12;
+        }
+        if(code[lp+1] == '>')
+        {
+          t=10;
+        }
       }
       if (code[lp] == '>')
       {
         t = 13;
+        if(code[lp+1] == '=')
+        {
+          t= 13;
+        }
       }
       if (code[lp] == ';')
       {
@@ -257,6 +263,10 @@ int parse(char *code, lexeme list[], FILE *fplex)
       if (code[lp] == ':')
       {
         t = 20;
+        if(code[lp+1] == '=')
+        {
+          t=9;
+        }
       }
 
       buffer[0] = code[lp];
@@ -267,7 +277,6 @@ int parse(char *code, lexeme list[], FILE *fplex)
       lp++;
     }
   }
-  printf("\nFinished parse\n");
   return listIndex;
 }
 
@@ -967,7 +976,7 @@ int main(int argc, char **argv)
   }
 
   // Scanning file into code array
-  printf("\nScanning file into code array\n");
+
   while(!feof(fpin))
   {
     fgets(aSingleLine, MAX_CODE_LENGTH, fpin);
@@ -975,10 +984,10 @@ int main(int argc, char **argv)
   }
 
   // Removing all comments from code
-  printf("\nRemoving all comments from code\n");
+
   strcpy(code, trim(code, trimmed));
   // Filling lexeme array and capturing number of elements of lexeme array
-  printf("\nFilling lexeme array and capturing number of elements of lexeme array\n");
+
   count = parse(code, list, fplex);
   // Printing output that represents the lexeme array
   output(list, count, fplex); // <- change so that this line only executes if parse is successful
@@ -988,4 +997,5 @@ int main(int argc, char **argv)
   fclose(fplex);
   return 0;
 }
+
 
