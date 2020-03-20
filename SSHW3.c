@@ -1,4 +1,4 @@
-/ Michael Said
+// Michael Said
 // Liam May
 // COP 3402
 // Spring 2020
@@ -66,6 +66,7 @@ int condition(token current);
 void expression(token current);
 void term(token current);
 int factor(token current);
+void print(int tokenRep);
 
 lexeme *createLexeme(token_type t, char *str)
 {
@@ -516,29 +517,112 @@ token_type reserved(char *str)
 void output(lexeme list[], int count, FILE *fplex, bool l, bool a, bool v)
 {
   int i = 0;
+  char buffer[13] = {'\0'};
 
   if (l == false && a == false && v == false)
   {
     fprintf(fplex, "in\tout\n");
     return;
   }
-  if (l == true && a == false && v == false)
+  if (l == true)
   {
-    fprintf(fplex, "List of lexemes/tokens:\n\n");
+    fprintf(fplex, "List of lexemes:\n\n");
     for (i = 0; i < count; i++)
     {
       fprintf(fplex, "%s", list[i].lexeme);
       (i % 10 == 0) ? fprintf(fplex, "\n") : fprintf(fplex, "\t");
     }
-    fprintf(fplex, "Symbolic representation:\n\n");
+    fprintf(fplex, "\n\nSymbolic representation:\n\n");
     for (i = 0; i < count; i++)
     {
-      fprintf(fplex, "%s", list[i].type);
+      // fprintf(fplex, "%s", list[i].type);
+      // call print to conver number to string
+      print(list[i].type);
       (i % 10 == 0) ? fprintf(fplex, "\n") : fprintf(fplex, "\t");
     }
+    fprintf(fplex, "\nNo errors, program is syntactically correct\n\n");
   }
+  if (a == true)
+  {
 
-  fprintf(fplex, "No errors, program is syntactically correct\n\n");
+  }
+  if (v == true)
+  {
+
+  }
+}
+
+void print(int tokenRep)
+{
+  switch (tokenRep)
+  {
+    case 1: fprintf(fplex, "nulsym");
+      break;
+    case 2: fprintf(fplex, "identsym");
+      break;
+    case 3: fprintf(fplex, "numbersym");
+      break;
+    case 4: fprintf(fplex, "plussym");
+      break;
+    case 5: fprintf(fplex, "minussym");
+      break;
+    case 6: fprintf(fplex, "multsym");
+      break;
+    case 7: fprintf(fplex, "slashsym");
+      break;
+    case 8: fprintf(fplex, "oddsym");
+      break;
+    case 9: fprintf(fplex, "eqlsym");
+      break;
+    case 10: fprintf(fplex, "neqsym");
+      break;
+    case 11: fprintf(fplex, "lessym");
+      break;
+    case 12: fprintf(fplex, "leqsym");
+      break;
+    case 13: fprintf(fplex, "gtrsym");
+      break;
+    case 14: fprintf(fplex, "geqsym");
+      break;
+    case 15: fprintf(fplex, "lparentsym");
+      break;
+    case 16: fprintf(fplex, "rparentsym");
+      break;
+    case 17: fprintf(fplex, "commasym");
+      break;
+    case 18: fprintf(fplex, "semicolonsym");
+      break;
+    case 19: fprintf(fplex, "periodsym");
+      break;
+    case 20: fprintf(fplex, "becomessym");
+      break;
+    case 21: fprintf(fplex, "beginsym");
+      break;
+    case 22: fprintf(fplex, "endsym");
+      break;
+    case 23: fprintf(fplex, "ifsym");
+      break;
+    case 24: fprintf(fplex, "thensym");
+      break;
+    case 25: fprintf(fplex, "whilesym");
+      break;
+    case 26: fprintf(fplex, "dosym");
+      break;
+    case 27: fprintf(fplex, "callsym");
+      break;
+    case 28: fprintf(fplex, "constsym");
+      break;
+    case 29: fprintf(fplex, "varsym");
+      break;
+    case 30: fprintf(fplex, "procsym");
+      break;
+    case 31: fprintf(fplex, "writesym");
+      break;
+    case 32: fprintf(fplex, "readsym");
+      break;
+    case 33: fprintf(fplex, "elsesym");
+      break;
+  }
 }
 
 // Places the token from the index of the lexeme list and assigns it to current
@@ -1014,18 +1098,17 @@ int main(int argc, char **argv)
   // Removing all comments from code
   strcpy(code, trim(code, trimmed));
   // Filling lexeme array and capturing number of elements of lexeme array
+  // (or 0 if parse found errors)
   count = parse(code, list, fplex);
+
   if (count == 0)
-    return 0;
-
-  // Printing output that represents the lexeme array
-  if (argc > 3)
   {
-    output(list, count, fplex, l, a, v); // <- change so that this line only executes if parse is successful
+    fprintf(fplex, "Error(s), program is not syntactically correct\n");
+    return 0;
   }
+  // Printing output
+  output(list, count, fplex, l, a, v); // <- change so that this line only executes if parse is successful
   block(current);
-
-  // run program on VM
 
   fclose(fpin);
   fclose(fplex);
