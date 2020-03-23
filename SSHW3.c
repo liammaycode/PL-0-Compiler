@@ -13,10 +13,13 @@
 #include <ctype.h>
 #include <stdlib.h>
 
+#define MAX_DATA_STACK_HEIGHT 40
 #define MAX_IDENT_LENGTH 11
 #define MAX_NUM_LENGTH 5
 #define MAX_CODE_LENGTH 550
 #define MAX_SYMBOL_TABLE_SIZE 500
+
+FILE *fpin, *fplex;
 
 typedef enum
 {
@@ -49,20 +52,297 @@ typedef struct
   char value[12];
 }token;
 
+typedef struct{
+  int op;
+  int r;
+  int l;
+  int m;
+}instruction;
+
+int base(int l, int base, int* data_stack);
 char* trim(char *str, char *trimmed);
-int parse(char *code, lexeme list[], FILE *fplex);
+int parse(char *code, lexeme list[], FILE *fplex, symbol symbol_table[]);
 bool isReserved(char *str);
 token_type reserved(char *str);
 lexeme *createLexeme(token_type t, char *str);
 bool isNumber(char *str);
 bool isSymbol(char symbol);
-void output(lexeme list[], int count, FILE *fplex);
-void block(token current);
-void statement(token current);
-void condition(token current);
+void output(lexeme list[], instruction ins[], int count, FILE *fplex, bool l, bool a, bool v);
+int block(token current);
+int statement(token current);
+int condition(token current);
 void expression(token current);
 void term(token current);
-void factor(token current);
+int factor(token current);
+void print(int tokenRep);
+
+// Given the four values that make up an instruction, returns the address of
+// an instruction type object
+instruction *create_instruction(int op, int r, int l, int m)
+{
+	instruction *i = calloc(1, sizeof(instruction));
+	i->op = op;
+  i->r = r;
+  i->l = l;
+  i->m = m;
+
+	return i;
+}
+
+// Returns the integer array that make a specific instruction to executionCycle
+// to be processed. Takes in as arguments the array of all instructions, the array
+// to be returned, and a counter which signals the instruction being requested.
+instruction *fetchCycle(int *code, instruction *ir, int pc)
+{
+  int index = pc * 4;
+  // printf("accessing code[%d]\n", index);
+  ir->op = code[index++];
+  // index++;
+  // printf("accessing code[%d]\n", index);
+  ir->r = code[index++];
+  // index++;
+  // printf("accessing code[%d]\n", index);
+  ir->l = code[index++];
+  // index++;
+  // printf("accessing code[%d]\n", index);
+  ir->m = code[index];
+  return ir;
+}
+
+void super_output(int pc, int bp, int sp,int data_stack[], int reg[], int activate)
+{
+  int x;
+  int g =0;
+  printf("%d\t%d\t%d\t", pc, bp, sp);
+  for (x = 0; x < 8; x++)
+  {
+    printf("%d ", reg[x]);
+  }
+  printf("\nStack:");
+  for (x = 1; x < sp; x++)
+  {
+    if(activate == 1 && g ==6)
+    {
+      printf("|");
+    }
+    g++;
+
+    printf("%d ", data_stack[x]);
+    if(x == 7)
+    {
+      sp = sp+1;
+    }
+
+  }
+  printf("\n");
+  return;
+}
+
+// takes in a single instruction and executes the command of that instruction
+void executionCycle(int *code)
+{
+  int sp = 0, bp = 1, pc = 0, halt = 1, i = 0, activate = 0, x;
+  int data_stack[MAX_DATA_STACK_HEIGHT] = {0}, reg[8] = {0};
+  instruction *ir = create_instruction(0, 0, 0, 0);
+
+  // Capturing instruction integers indicated by program counter
+  ir = fetchCycle(code, ir, pc);
+
+  printf("\t\tpc\tbp\tsp\tregisters\n");
+  printf("Initial values\t%d\t%d\t%d\t", pc, bp, sp);
+  for (x = 0; x < 8; x++)
+  {
+    printf("%d ", reg[x]);
+  }
+  printf("\nStack: ");
+  for (x = 0; x < MAX_DATA_STACK_HEIGHT; x++)
+  {
+    printf("%d ", data_stack[x]);
+  }
+  printf("\n");
+
+  while (halt == 1)
+  {
+    // printf("6\n");
+    switch(ir->op)
+    {
+       case 1:
+        printf("%d lit %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+        reg[ir->r] = ir->m;
+        super_output(pc, bp, sp, data_stack, reg, activate);
+        break;
+
+       case 2:
+        printf("%d rtn %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+        sp = bp - 1;
+        bp = data_stack[sp + 3];
+        pc = data_stack[sp + 4];
+        super_output(pc, bp, sp, data_stack, reg, activate);
+        break;
+
+       case 3:
+        printf("%d lod %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+        reg[ir->r] = data_stack[base(ir->l, bp, data_stack) + ir->m];
+        super_output(pc, bp, sp, data_stack, reg, activate);
+        break;
+
+       case 4:
+        printf("%d sto %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+        data_stack[ base(ir->l, bp, data_stack) + ir->m] = reg[ir->r];
+        super_output(pc, bp, sp, data_stack, reg, activate);
+        break;
+
+       case 5:
+        printf("%d cal %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+        data_stack[sp + 1]  = 0;
+        data_stack[sp + 2]  =  base(ir->l, bp, data_stack);
+        data_stack[sp + 3]  = bp;
+        data_stack[sp + 4]  = pc;
+        bp = sp + 1;
+        pc = ir->m;
+        super_output(pc, bp, sp, data_stack, reg, activate);
+        activate = 1;
+        break;
+
+       case 6:
+         printf("%d inc %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+         sp = sp + ir->m;
+         super_output(pc, bp, sp, data_stack, reg, activate);
+         break;
+
+       case 7:
+         printf("%d jmp %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+         pc = ir->m;
+         super_output(pc, bp, sp, data_stack, reg, activate);
+         break;
+
+       case 8:
+         printf("%d jpc %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+         if(reg[ir->r] == 0)
+         {
+             pc = ir->m;
+         }
+         super_output(pc, bp, sp, data_stack, reg, activate);
+         break;
+
+////////////////////////////////////?????????????????????
+       case 9:
+         printf("%d sio %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+         printf("%d", reg[ir->r]);
+         super_output(pc, bp, sp, data_stack, reg, activate);
+         break;
+
+         case 10:
+           printf("%d sio %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+           //stated in class to let the user know what they were scanning in
+           printf("read in the register at index ir->r");
+           scanf("%d", &reg[ir->r]);
+           super_output(pc, bp, sp, data_stack, reg, activate);
+           break;
+
+        case 11:
+          printf("%d sio %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          halt = 0;
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 12:
+          printf("%d neg %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = -reg[ir->r];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 13:
+          printf("%d add %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] + reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 14:
+          printf("%d sub %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] - reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 15:
+          printf("%d mul %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] * reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 16:
+          printf("%d div %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] / reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 17:
+          printf("%d odd %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] % 2;
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 18:
+          printf("%d mod %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] %  reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 19:
+          printf("%d eql %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] == reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 20:
+          printf("%d neq %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] != reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 21:
+          printf("%d lss %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] < reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 22:
+          printf("%d leq %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] <= reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+         case 23:
+          printf("%d gtr %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] <= reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        default:
+          printf("%d geq %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] >= reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+      }
+      // printf("Instruction executed...\n");
+
+      ir = fetchCycle(code, ir, pc++);
+
+  }
+  return;
+}
+
+int base(int l, int base, int* data_stack)
+// l stand for L in the instruction format
+{
+  int b1; //find base L levels down
+  b1 = base;
+  while (l > 0)
+  {
+    b1 = data_stack[b1 + 1];
+    l--;
+  }
+  return b1;
+}
 
 lexeme *createLexeme(token_type t, char *str)
 {
@@ -98,17 +378,16 @@ char* trim(char *str, char *trimmed)
 }
 
 // Parses words from the code to be evaluated, adds them to the lexeme array,
-// and returns the number of lexemes that were added to the array
-int parse(char *code, lexeme list[], FILE *fplex)
+// and returns the number of lexemes that were added to the array or 0 if there
+// was an error
+int parse(char *code, lexeme list[], FILE *fplex, symbol symbol_table[])
 {
   lexeme *lexptr;
-  int lp = 0, rp, length, i, listIndex = 0;
+  int lp = 0, rp, length, i, listIndex = 0, symIndex = 0;
   char buffer[MAX_CODE_LENGTH];
   token_type t;
 
-  printf("\nMade it to parse\n");
   // looping through string containing input
-  printf("\nlooping through string containing input\n");
   while (code[lp] != '\0')
   {
     // ignoring whitespace
@@ -122,7 +401,6 @@ int parse(char *code, lexeme list[], FILE *fplex)
       rp = lp;
 
       // capturing length of substring
-      printf("capturing length of substring\n");
       while (isalpha(code[rp]) || isdigit(code[rp]))
       {
         rp++;
@@ -130,7 +408,6 @@ int parse(char *code, lexeme list[], FILE *fplex)
       length = rp - lp;
 
       // checking for ident length error
-      printf("checking for ident length error\n");
       if (length > MAX_IDENT_LENGTH)
       {
         fprintf(fplex, "Err: ident length too long\n");
@@ -138,7 +415,6 @@ int parse(char *code, lexeme list[], FILE *fplex)
       }
 
       // creating substring
-      printf("creating substring\n");
       for (i = 0; i < length; i++)
       {
         buffer[i] = code[lp + i];
@@ -147,13 +423,10 @@ int parse(char *code, lexeme list[], FILE *fplex)
       lp = rp;
 
       // adds reserved words to lexeme array
-      printf("adds reserved words to lexeme array\n");
       if (isReserved(buffer))
       {
         t = reserved(buffer);
-        printf("155\n");
         lexptr = createLexeme(t, buffer); // segfault??
-        printf("157\n");
         list[listIndex++] = *lexptr;
       }
       // must be a identifier at this line
@@ -161,7 +434,6 @@ int parse(char *code, lexeme list[], FILE *fplex)
       else
       {
         t = identsym;
-        printf("164\n");
         lexptr = createLexeme(t, buffer);
         list[listIndex++] = *lexptr;
       }
@@ -172,7 +444,6 @@ int parse(char *code, lexeme list[], FILE *fplex)
 
       i = 0;
       // capturing length of substring
-      printf("capturing length of substring\n");
       while (isdigit(code[lp + i]))
       {
         rp++;
@@ -201,7 +472,7 @@ int parse(char *code, lexeme list[], FILE *fplex)
     }
 
     // Creating a lexeme for the symbol
-    else if (isSymbol(code[lp]))
+     else if (isSymbol(code[lp]))
     {
       if (code[lp] == '+')
       {
@@ -242,10 +513,22 @@ int parse(char *code, lexeme list[], FILE *fplex)
       if (code[lp] == '<')
       {
         t = 11;
+        if(code[lp+1] == '=')
+        {
+          t=12;
+        }
+        if(code[lp+1] == '>')
+        {
+          t=10;
+        }
       }
       if (code[lp] == '>')
       {
         t = 13;
+        if(code[lp+1] == '=')
+        {
+          t= 13;
+        }
       }
       if (code[lp] == ';')
       {
@@ -254,6 +537,10 @@ int parse(char *code, lexeme list[], FILE *fplex)
       if (code[lp] == ':')
       {
         t = 20;
+        if(code[lp+1] == '=')
+        {
+          t=9;
+        }
       }
 
       buffer[0] = code[lp];
@@ -264,7 +551,6 @@ int parse(char *code, lexeme list[], FILE *fplex)
       lp++;
     }
   }
-  printf("\nFinished parse\n");
   return listIndex;
 }
 
@@ -504,48 +790,160 @@ token_type reserved(char *str)
 }
 
 // Prints leveme list to output file
-void output(lexeme list[], int count, FILE *fplex)
+void output(lexeme list[], instruction ins[], int count, FILE *fplex, bool l, bool a, bool v)
 {
   int i = 0;
-  // fprintf(fplex, "Lexeme Table:\nLexeme\t\tToken Type\n");
-  // for (i = 0; i < count; i++)
-  // {
-  //   fprintf(fplex, "%s\t\t%d\n", list[i].lexeme, list[i].type);
-  // }
+  char buffer[13] = {'\0'};
 
-  // fprintf(fplex, "Lexeme List:\n");
-  for(i = 0; i < count; i++)
+  if (l == false && a == false && v == false)
   {
-    fprintf(fplex, "%d ", list[i].type);
-    if(list[i].type == 2 || list[i].type == 3)
+    fprintf(fplex, "in\tout\n");
+    return;
+  }
+  if (l == true)
+  {
+    fprintf(fplex, "List of lexemes:\n\n");
+    for (i = 0; i < count; i++)
     {
-      fprintf(fplex, "%s ", list[i].lexeme);
+      fprintf(fplex, "%s", list[i].lexeme);
+      (i % 10 == 0) ? fprintf(fplex, "\n") : fprintf(fplex, "\t");
+    }
+    fprintf(fplex, "\n\nSymbolic representation:\n\n");
+    for (i = 0; i < count; i++)
+    {
+      // fprintf(fplex, "%s", list[i].type);
+      // call print to conver number to string
+      print(list[i].type);
+      (i % 10 == 0) ? fprintf(fplex, "\n") : fprintf(fplex, "\t");
+    }
+    fprintf(fplex, "\nNo errors, program is syntactically correct\n\n");
+  }
+
+  if (a == true)
+  {
+    for(i; i < MAX_CODE_LENGTH; i++ )
+    {
+      ins[i].op = 0;
+      ins[i].r = 0;
+      ins[i].l = 0;
+      ins[i].m = 0;
+
+      i=0;
+      while((ins[i].op != 0 && ins[i].r != 0 && ins[i].l !=0 && ins[i].m !=0))
+      {
+        fprintf(fplex, "%d %d %d %d \n", ins[i].op, ins[i].r, ins[i].l, ins[i].m);
+        i++;
+      }
     }
   }
-  fprintf(fplex, "\n");
+
+  if (v == true)
+  {
+
+  }
+}
+
+void print(int tokenRep)
+{
+  switch (tokenRep)
+  {
+    case 1: fprintf(fplex, "nulsym");
+      break;
+    case 2: fprintf(fplex, "identsym");
+      break;
+    case 3: fprintf(fplex, "numbersym");
+      break;
+    case 4: fprintf(fplex, "plussym");
+      break;
+    case 5: fprintf(fplex, "minussym");
+      break;
+    case 6: fprintf(fplex, "multsym");
+      break;
+    case 7: fprintf(fplex, "slashsym");
+      break;
+    case 8: fprintf(fplex, "oddsym");
+      break;
+    case 9: fprintf(fplex, "eqlsym");
+      break;
+    case 10: fprintf(fplex, "neqsym");
+      break;
+    case 11: fprintf(fplex, "lessym");
+      break;
+    case 12: fprintf(fplex, "leqsym");
+      break;
+    case 13: fprintf(fplex, "gtrsym");
+      break;
+    case 14: fprintf(fplex, "geqsym");
+      break;
+    case 15: fprintf(fplex, "lparentsym");
+      break;
+    case 16: fprintf(fplex, "rparentsym");
+      break;
+    case 17: fprintf(fplex, "commasym");
+      break;
+    case 18: fprintf(fplex, "semicolonsym");
+      break;
+    case 19: fprintf(fplex, "periodsym");
+      break;
+    case 20: fprintf(fplex, "becomessym");
+      break;
+    case 21: fprintf(fplex, "beginsym");
+      break;
+    case 22: fprintf(fplex, "endsym");
+      break;
+    case 23: fprintf(fplex, "ifsym");
+      break;
+    case 24: fprintf(fplex, "thensym");
+      break;
+    case 25: fprintf(fplex, "whilesym");
+      break;
+    case 26: fprintf(fplex, "dosym");
+      break;
+    case 27: fprintf(fplex, "callsym");
+      break;
+    case 28: fprintf(fplex, "constsym");
+      break;
+    case 29: fprintf(fplex, "varsym");
+      break;
+    case 30: fprintf(fplex, "procsym");
+      break;
+    case 31: fprintf(fplex, "writesym");
+      break;
+    case 32: fprintf(fplex, "readsym");
+      break;
+    case 33: fprintf(fplex, "elsesym");
+      break;
+  }
 }
 
 // Places the token from the index of the lexeme list and assigns it to current
 // token
 void getToken(token current)
 {
-  // int i = 0;
-  //
-  // // Assigning lexeme token at index to current
-  // current.type = list[index].type;
-  //
-  // // If token type is identsym or numbersym, assigning value to next index of array
-  // if (current.type == 2 || current.type == 3)
-  // {
-  //   strcpy(current.value, list[index + 1].lexeme);
-  // }
+  char buffer[MAX_CODE_LENGTH];
+  if (fscanf(fplex, "%s", buffer) != EOF)
+  {
+    if (strcmp(buffer, "2") == 0 || strcmp(buffer, "3") == 0)
+    {
+      fscanf(fplex, "%s", buffer);
+    }
+    else
+    {
+      current.value[0] = '\0';
+    }
+    strcpy(current.value, buffer);
+  }
+  else
+  {
+    current.type = nulsym;
+    current.value[0] = '\0';
+  }
 }
 
 void findError(int errorNum)
 {
-    switch( errorNum )
-    {
-
+  switch( errorNum )
+  {
     case 1:
       printf("Use = instead of := \n");
       break;
@@ -646,17 +1044,20 @@ void findError(int errorNum)
       printf("This number is too large\n");
       break;
 
-      default:
-      printf("Invalid instruction");
-    }
+    default:
+    printf("Invalid instruction");
+  }
 }
 
-void insertSymbols(int counter, symbol symbol_table[], int kind, char name[], int val, int level, int addr)
+// Stores passed values in symbol table
+// For constants (28), you must store kind, name and value.
+// For variables (29), you must store kind, name, L and M.
+void insertSymbol(int counter, symbol symbol_table[], int kind, char name[], int val, int level, int addr)
 {
-  //filling in the symbol tables with current data
-  //note: counter needs to be set to zero in main
+  // Filling in the symbol tables with current data
+  // Note: counter needs to be set to zero in main
   symbol_table[counter].kind = kind;
-  //capture name string and insert it into symbol table as a string
+  // Captures name string and insert it into symbol table as a string
   strcpy(symbol_table[counter].name, name);
   symbol_table[counter].val = val;
   symbol_table[counter].level = level;
@@ -665,7 +1066,7 @@ void insertSymbols(int counter, symbol symbol_table[], int kind, char name[], in
   counter++;
 }
 
-void block(token current)
+int block(token current)
 {
   if (current.type == constsym)
   {
@@ -673,14 +1074,26 @@ void block(token current)
     {
       getToken(current);
       if (current.type != identsym)
+      {
         findError(4);
+        return 0;
+      }
       if (current.type != eqlsym)
+      {
         findError(3);
+        return 0;
+      }
       if (current.type != numbersym)
+      {
         findError(2);
+        return 0;
+      }
     }
     if (current.type != semicolonsym)
+    {
       findError(5);
+      return 0;
+    }
     getToken(current);
   }
   if (current.type = varsym) // ???
@@ -689,59 +1102,88 @@ void block(token current)
     {
       getToken(current);
       if (current.type != identsym)
+      {
         findError(4);
+        return 0;
+      }
       getToken(current);
     }
     if (current.type != semicolonsym)
+    {
       findError(5);
+      return 0;
+    }
     getToken(current);
   }
   while (current.type == procsym)
   {
     getToken(current);
     if (current.type != identsym)
+    {
       findError(4); // maybee???????
+      return 0;
+    }
     getToken(current);
     if (current.type != semicolonsym)
+    {
       findError(5);
+      return 0;
+    }
     getToken(current);
   }
   while (current.type == procsym)
   {
     getToken(current);
     if (current.type != identsym)
+    {
       findError(4); // ???
+      return 0;
+    }
     getToken(current);
     if (current.type != semicolonsym)
+    {
       findError(5);
+      return 0;
+    }
     getToken(current);
-
     block(current);
 
     if (current.type != semicolonsym)
+    {
       findError(5);
+      return 0;
+    }
     getToken(current);
   }
-  statement(current);
+  if (statement(current) == 0)
+    return 0;
+
+  return 1;
 }
 
-void program(token current)
+int program(token current)
 {
   getToken(current);
-  block(current);
+  if (block(current) == 0)
+    return 0;
   if(current.type != periodsym)
   {
-  findError(9);
+    findError(9);
+    return 0;
   }
+  return 1;
 }
 
-void statement(token current)
+int statement(token current)
 {
   if(current.type == identsym)
   {
     getToken(current);
     if(current.type != becomessym)
+    {
       findError(6); // ??????????
+      return 0;
+    }
     getToken(current);
     expression(current);
   }
@@ -749,21 +1191,31 @@ void statement(token current)
   {
     getToken(current);
     if(current.type != identsym)
-    findError(4);
+    {
+      findError(4);
+      return 0;
+    }
     getToken(current);
   }
   else if(current.type == beginsym)
   {
     getToken(current);
-    statement(current);
+    if (statement(current) == 0)
+    {
+      return 0;
+    }
     while(current.type == semicolonsym)
     {
       getToken(current);
-      statement(current);
+      if (statement(current) == 0)
+      {
+        return 0;
+      }
     }
     if(current.type != endsym)
     {
       findError(5);
+      return 0;
     }
     getToken(current);
   }
@@ -771,25 +1223,40 @@ void statement(token current)
   else if(current.type == ifsym)
   {
     getToken(current);
-    condition(current);
-    if(current.type != thensym)
-    findError(16);
-    statement(current);
-  }
-  else if(current.type ==whilesym)
-  {
-    getToken(current);
-    condition(current);
-    if(current.type != dosym)
+    if (condition(current) == 0)
     {
-    getToken(current);
-    statement(current);
+      return 0;
+    }
+    if(current.type != thensym)
+    {
+      findError(16);
+      return 0;
+    }
+    if (statement(current) == 0)
+    {
+      return 0;
     }
   }
-
+  else if(current.type == whilesym)
+  {
+    getToken(current);
+    if (condition(current) == 0)
+    {
+      return 0;
+    }
+    if(current.type != dosym)
+    {
+      getToken(current);
+      if (statement(current) == 0)
+      {
+        return 0;
+      }
+    }
+  }
+  return 1;
 }
 
-void condition(token current)
+int condition(token current)
 {
   if (current.type == oddsym)
   {
@@ -801,10 +1268,14 @@ void condition(token current)
     expression(current);
     if (current.type != eqlsym && current.type != neqsym && current.type != lessym
         && current.type != leqsym && current.type != gtrsym && current.type != geqsym)
-        findError(20);
+    {
+      findError(20);
+      return 0;
+    }
     getToken(current);
     expression(current);
   }
+  return 1;
 }
 
 void expression(token current)
@@ -818,15 +1289,21 @@ void expression(token current)
 
 void term(token current)
 {
-  factor(current);
+  if (factor(current) == 0)
+  {
+    return;
+  }
   while (current.type == multsym || current.type == slashsym)
   {
     getToken(current);
-    factor(current);
+    if (factor(current) == 0)
+    {
+      return;
+    }
   }
 }
 
-void factor(token current)
+int factor(token current)
 {
   if (current.type == identsym)
   {
@@ -843,32 +1320,60 @@ void factor(token current)
     if (current.type != rparentsym)
     {
       findError(22);
-      getToken(current);
+      return 0;
     }
+    getToken(current);
   }
   else
   {
     findError(23); // ???
+    return 0;
   }
+  return 1;
 }
 
 int main(int argc, char **argv)
 {
-  FILE *fpin, *fplex;
   fpin = fopen(argv[1], "r");
-  fplex = fopen(argv[2], "r+");
+  fplex = fopen(argv[2], "w+");
   char aSingleLine[MAX_CODE_LENGTH], code[MAX_CODE_LENGTH] = {'\0'},
-       trimmed[MAX_CODE_LENGTH] = {'\0'};
+       trimmed[MAX_CODE_LENGTH] = {'\0'}, commands[3][3];
   lexeme list[MAX_CODE_LENGTH] = {'\0'};
   int count, i, tokens[MAX_SYMBOL_TABLE_SIZE] = {'\0'};
   symbol symbol_table[MAX_SYMBOL_TABLE_SIZE];
+  instruction ins[MAX_CODE_LENGTH] = {'\0'};
   token current;
+  bool l = false, a = false, v = false;
 
   // output for user that makes error entering command line arguments
-  if (argc < 3)
+  if (argc < 3 || argc > 6)
   {
-    printf("Err: incorrect program call\nSyntax: ./a.out <inputfilename> <outputfilename>\n");
     return 0;
+  }
+  if (argc == 4)
+  {
+    strcpy(commands[0], argv[3]);
+  }
+  if (argc == 5)
+  {
+    strcpy(commands[0], argv[3]);
+    strcpy(commands[1], argv[4]);
+  }
+  if (argc == 6)
+  {
+    strcpy(commands[0], argv[3]);
+    strcpy(commands[1], argv[4]);
+    strcpy(commands[2], argv[5]);
+  }
+
+  for (i = 0; i < (argc - 3); i++)
+  {
+    if (strcmp(commands[i], "-l") == 0)
+      l = true;
+    if (strcmp(commands[i], "-a") == 0)
+      a = true;
+    if (strcmp(commands[i], "-v") == 0)
+      v = true;
   }
   // Preventing file errors by checking for failures to open files
   if (fpin == NULL)
@@ -883,7 +1388,6 @@ int main(int argc, char **argv)
   }
 
   // Scanning file into code array
-  printf("\nScanning file into code array\n");
   while(!feof(fpin))
   {
     fgets(aSingleLine, MAX_CODE_LENGTH, fpin);
@@ -891,13 +1395,18 @@ int main(int argc, char **argv)
   }
 
   // Removing all comments from code
-  printf("\nRemoving all comments from code\n");
   strcpy(code, trim(code, trimmed));
   // Filling lexeme array and capturing number of elements of lexeme array
-  printf("\nFilling lexeme array and capturing number of elements of lexeme array\n");
-  count = parse(code, list, fplex);
-  // Printing output that represents the lexeme array
-  output(list, count, fplex);
+  // (or 0 if parse found errors)
+  count = parse(code, list, fplex, symbol_table);
+
+  if (count == 0)
+  {
+    fprintf(fplex, "Error(s), program is not syntactically correct\n");
+    return 0;
+  }
+  // Printing output
+  output(list, ins, count, fplex, l, a, v); // <- change so that this line only executes if parse is successful
   block(current);
 
   fclose(fpin);
