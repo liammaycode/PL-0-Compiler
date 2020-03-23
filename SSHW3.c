@@ -1114,9 +1114,24 @@ int main(int argc, char **argv)
     fprintf(fplex, "Error(s), program is not syntactically correct\n");
     return 0;
   }
+	
+  for(i; i < MAX_CODE_LENGTH; i++ ){
+    code[i].op = 0;
+    code[i].r = 0;
+    code[i].l = 0;
+    code[i].m = 0;
+  }
+	
   // Printing output
   output(list, count, fplex, l, a, v); // <- change so that this line only executes if parse is successful
   block(current);
+	
+  i=0;
+  while((code[i].op != 0 && code[i].r != 0 && code[i].l !=0 && code[i].m !=0))
+  {
+    fprintf(fplex, "%d %d %d %d \n", code[i].op, code[i].r, code[i].l, code[i].m)
+    i++
+  }
 
   fclose(fpin);
   fclose(fplex);
