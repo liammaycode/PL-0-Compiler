@@ -5,7 +5,9 @@
 
 // This program is a representation of a PL/0 compiler in c. It contains a compiler
 // driver, a parser, and an intermediate code generator. In this representation of
-// PL/0 ":=" is represented by "=".
+// This code takes as input a text file containing PL/0 code. It then represents
+// the text as a list of lexemes and converts those lexemes into assembly code.
+// That assembly code is then passed to our virtual machine to be executed.
 
 #include <stdio.h>
 #include <string.h>
@@ -39,29 +41,30 @@ typedef struct lexemes
 
 typedef struct
 {
-	int kind; 		// const = 1, var = 2, proc = 3
-	char name[10];	// name up to 11 chars
-	int val; 		// number (ASCII value)
-	int level; 		// L level
-	int addr; 		// M address
-}symbol;
-
-typedef struct
-{
   token_type type;
   char value[12];
 }token;
 
-typedef struct{
+typedef struct
+{
   int op;
   int r;
   int l;
   int m;
 }instruction;
 
+typedef struct
+{
+  int kind; // const = 1, var = 2, proc = 3
+  char name[12]; // name up to 11 characters
+  int val; // ascii value
+  int level; // L
+  int addr; // M
+} symbol;
+
 int base(int l, int base, int* data_stack);
 char* trim(char *str, char *trimmed);
-int parse(char *code, lexeme list[], FILE *fplex, symbol symbol_table[]);
+int parse(char *code, instruction ins[], lexeme list[], FILE *fplex, symbol symbol_table[]);
 bool isReserved(char *str);
 token_type reserved(char *str);
 lexeme *createLexeme(token_type t, char *str);
@@ -132,13 +135,12 @@ void super_output(int pc, int bp, int sp,int data_stack[], int reg[], int activa
     {
       sp = sp+1;
     }
-
   }
   printf("\n");
   return;
 }
 
-// takes in a single instruction and executes the command of that instruction
+// Takes in a single instruction and executes the command of that instruction
 void executionCycle(int *code)
 {
   int sp = 0, bp = 1, pc = 0, halt = 1, i = 0, activate = 0, x;
@@ -195,7 +197,7 @@ void executionCycle(int *code)
        case 5:
         printf("%d cal %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
         data_stack[sp + 1]  = 0;
-        data_stack[sp + 2]  =  base(ir->l, bp, data_stack);
+        data_stack[sp + 2]  = base(ir->l, bp, data_stack);
         data_stack[sp + 3]  = bp;
         data_stack[sp + 4]  = pc;
         bp = sp + 1;
@@ -377,10 +379,11 @@ char* trim(char *str, char *trimmed)
   return trimmed;
 }
 
-// Parses words from the code to be evaluated, adds them to the lexeme array,
+// Parses words from the code to be evaluated, adds them to the lexeme array (list),
+// converts them to assembly, adds them to the instruction array (ins),
 // and returns the number of lexemes that were added to the array or 0 if there
 // was an error
-int parse(char *code, lexeme list[], FILE *fplex, symbol symbol_table[])
+int parse(char *code, instruction ins[], lexeme list[], FILE *fplex, symbol symbol_table[])
 {
   lexeme *lexptr;
   int lp = 0, rp, length, i, listIndex = 0, symIndex = 0;
@@ -789,17 +792,21 @@ token_type reserved(char *str)
   return 0;
 }
 
-// Prints leveme list to output file
+// Prints data to output file as requested by command line arguments
 void output(lexeme list[], instruction ins[], int count, FILE *fplex, bool l, bool a, bool v)
 {
   int i = 0;
   char buffer[13] = {'\0'};
 
+  // In the absence of commands, just printing "in" and "out"
   if (l == false && a == false && v == false)
   {
     fprintf(fplex, "in\tout\n");
     return;
   }
+
+  // If commanded to print list of lexemes, printing all elements of list and
+  // their symbol type (from token_type)
   if (l == true)
   {
     fprintf(fplex, "List of lexemes:\n\n");
@@ -812,29 +819,30 @@ void output(lexeme list[], instruction ins[], int count, FILE *fplex, bool l, bo
     for (i = 0; i < count; i++)
     {
       // fprintf(fplex, "%s", list[i].type);
-      // call print to conver number to string
+      // call print to convert number to string
       print(list[i].type);
       (i % 10 == 0) ? fprintf(fplex, "\n") : fprintf(fplex, "\t");
     }
     fprintf(fplex, "\nNo errors, program is syntactically correct\n\n");
   }
 
+  // If commanded to print generated assembly code, printing all elements of ins
   if (a == true)
   {
-    for(i; i < MAX_CODE_LENGTH; i++ )
-    {
-      ins[i].op = 0;
-      ins[i].r = 0;
-      ins[i].l = 0;
-      ins[i].m = 0;
-
-      i=0;
-      while((ins[i].op != 0 && ins[i].r != 0 && ins[i].l !=0 && ins[i].m !=0))
-      {
-        fprintf(fplex, "%d %d %d %d \n", ins[i].op, ins[i].r, ins[i].l, ins[i].m);
-        i++;
-      }
-    }
+    // for(i = 0; i < MAX_CODE_LENGTH; i++ )
+    // {
+    //   ins[i].op = 0;
+    //   ins[i].r = 0;
+    //   ins[i].l = 0;
+    //   ins[i].m = 0;
+    //
+    //   i = 0;
+    //   while((ins[i].op != 0 && ins[i].r != 0 && ins[i].l !=0 && ins[i].m !=0))
+    //   {
+    //     fprintf(fplex, "%d %d %d %d \n", ins[i].op, ins[i].r, ins[i].l, ins[i].m);
+    //     i++;
+    //   }
+    // }
   }
 
   if (v == true)
@@ -1103,6 +1111,7 @@ int block(token current)
       getToken(current);
       if (current.type != identsym)
       {
+        printf("1107\n");
         findError(4);
         return 0;
       }
@@ -1341,7 +1350,7 @@ int main(int argc, char **argv)
   lexeme list[MAX_CODE_LENGTH] = {'\0'};
   int count, i, tokens[MAX_SYMBOL_TABLE_SIZE] = {'\0'};
   symbol symbol_table[MAX_SYMBOL_TABLE_SIZE];
-  instruction ins[MAX_CODE_LENGTH] = {'\0'};
+  instruction ins[MAX_CODE_LENGTH];
   token current;
   bool l = false, a = false, v = false;
 
@@ -1375,7 +1384,7 @@ int main(int argc, char **argv)
     if (strcmp(commands[i], "-v") == 0)
       v = true;
   }
-  // Preventing file errors by checking for failures to open files
+  // Preventing segfault by checking for failures to open files
   if (fpin == NULL)
   {
     printf("File not found\n");
@@ -1398,7 +1407,7 @@ int main(int argc, char **argv)
   strcpy(code, trim(code, trimmed));
   // Filling lexeme array and capturing number of elements of lexeme array
   // (or 0 if parse found errors)
-  count = parse(code, list, fplex, symbol_table);
+  count = parse(code, ins, list, fplex, symbol_table);
 
   if (count == 0)
   {
@@ -1406,11 +1415,10 @@ int main(int argc, char **argv)
     return 0;
   }
   // Printing output
-  output(list, ins, count, fplex, l, a, v); // <- change so that this line only executes if parse is successful
+  output(list, ins, count, fplex, l, a, v);
   block(current);
 
   fclose(fpin);
   fclose(fplex);
   return 0;
 }
-
