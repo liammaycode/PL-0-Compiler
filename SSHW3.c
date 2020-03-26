@@ -3,9 +3,11 @@
 // COP 3402
 // Spring 2020
 
-// This program is a representation of a PL/0 compiler in c. It contains a compiler
-// driver, a parser, and an intermediate code generator. In this representation of
-// PL/0 ":=" is represented by "=".
+// This program is a representation of a PL/0 compiler in C. It contains a compiler
+// driver, a parser, and an intermediate code generator.
+// This code takes as input a text file containing PL/0 code. It then represents
+// the text as a list of lexemes and converts those lexemes into assembly code.
+// That assembly code is then passed to our virtual machine to be executed.
 
 #include <stdio.h>
 #include <string.h>
@@ -13,6 +15,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 
+#define MAX_DATA_STACK_HEIGHT 40
 #define MAX_IDENT_LENGTH 11
 #define MAX_NUM_LENGTH 5
 #define MAX_CODE_LENGTH 550
@@ -33,17 +36,8 @@ typedef enum
 typedef struct lexemes
 {
   token_type type;
-  char *lexeme;
+  char *lex;
 }lexeme;
-
-typedef struct
-{
-	int kind; 		// const = 1, var = 2, proc = 3
-	char name[10];	// name up to 11 chars
-	int val; 		// number (ASCII value)
-	int level; 		// L level
-	int addr; 		// M address
-}symbol;
 
 typedef struct
 {
@@ -51,15 +45,32 @@ typedef struct
   char value[12];
 }token;
 
+typedef struct
+{
+  int op;
+  int r;
+  int l;
+  int m;
+}instruction;
 
+typedef struct
+{
+  int kind; // const = 1, var = 2, proc = 3
+  char name[12]; // name up to 11 characters
+  int val; // ascii value
+  int level; // L
+  int addr; // M
+} symbol;
+
+int base(int l, int base, int* data_stack);
 char* trim(char *str, char *trimmed);
-int parse(char *code, lexeme list[], FILE *fplex, symbol symbol_table[]);
+int parse(char *code, instruction ins[], lexeme list[], FILE *fplex, symbol symbol_table[]);
 bool isReserved(char *str);
 token_type reserved(char *str);
 lexeme *createLexeme(token_type t, char *str);
 bool isNumber(char *str);
 bool isSymbol(char symbol);
-void output(lexeme list[], int count, FILE *fplex, bool l, bool a, bool v);
+void output(lexeme list[], instruction ins[], int count, FILE *fplex, bool l, bool a, bool v);
 int block(token current);
 int statement(token current);
 int condition(token current);
@@ -68,12 +79,278 @@ void term(token current);
 int factor(token current);
 void print(int tokenRep);
 
+// Returns address of a new construction object
+instruction *create_instruction(int op, int r, int l, int m)
+{
+	instruction *i = calloc(1, sizeof(instruction));
+	i->op = op;
+  i->r = r;
+  i->l = l;
+  i->m = m;
+
+	return i;
+}
+
+// Returns the instruction array that is used by executionCycle. Takes in as
+// arguments the array of all instructions, the array to be returned, and a
+// counter which signals the instruction being requested.
+instruction *fetchCycle(int *code, instruction *ir, int pc)
+{
+  int index = pc * 4;
+  // printf("accessing code[%d]\n", index);
+  ir->op = code[index++];
+  // index++;
+  // printf("accessing code[%d]\n", index);
+  ir->r = code[index++];
+  // index++;
+  // printf("accessing code[%d]\n", index);
+  ir->l = code[index++];
+  // index++;
+  // printf("accessing code[%d]\n", index);
+  ir->m = code[index];
+  return ir;
+}
+
+// Prints stack trace
+void super_output(int pc, int bp, int sp, int data_stack[], int reg[], int activate)
+{
+  int x;
+  int g =0;
+  printf("%d\t%d\t%d\t", pc, bp, sp);
+
+  for (x = 0; x < 8; x++)
+  {
+    printf("%d ", reg[x]);
+  }
+  printf("\nStack:");
+  for (x = 1; x < sp; x++)
+  {
+    if(activate == 1 && g ==6)
+    {
+      printf("|");
+    }
+    g++;
+
+    printf("%d ", data_stack[x]);
+    if(x == 7)
+    {
+      sp = sp+1;
+    }
+  }
+  printf("\n");
+  return;
+}
+
+// Takes in a single instruction and executes the command of that instruction
+void executionCycle(int *code)
+{
+  int sp = 0, bp = 1, pc = 0, halt = 1, i = 0, activate = 0, x;
+  int data_stack[MAX_DATA_STACK_HEIGHT] = {0}, reg[8] = {0};
+  instruction *ir = create_instruction(0, 0, 0, 0);
+
+  // Capturing instruction integers indicated by program counter
+  ir = fetchCycle(code, ir, pc);
+
+  printf("\t\tpc\tbp\tsp\tregisters\n");
+  printf("Initial values\t%d\t%d\t%d\t", pc, bp, sp);
+  for (x = 0; x < 8; x++)
+  {
+    printf("%d ", reg[x]);
+  }
+  printf("\nStack: ");
+  for (x = 0; x < MAX_DATA_STACK_HEIGHT; x++)
+  {
+    printf("%d ", data_stack[x]);
+  }
+  printf("\n");
+
+  while (halt == 1)
+  {
+    // printf("6\n");
+    switch(ir->op)
+    {
+       case 1:
+        printf("%d lit %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+        reg[ir->r] = ir->m;
+        super_output(pc, bp, sp, data_stack, reg, activate);
+        break;
+
+       case 2:
+        printf("%d rtn %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+        sp = bp - 1;
+        bp = data_stack[sp + 3];
+        pc = data_stack[sp + 4];
+        super_output(pc, bp, sp, data_stack, reg, activate);
+        break;
+
+       case 3:
+        printf("%d lod %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+        reg[ir->r] = data_stack[base(ir->l, bp, data_stack) + ir->m];
+        super_output(pc, bp, sp, data_stack, reg, activate);
+        break;
+
+       case 4:
+        printf("%d sto %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+        data_stack[ base(ir->l, bp, data_stack) + ir->m] = reg[ir->r];
+        super_output(pc, bp, sp, data_stack, reg, activate);
+        break;
+
+       case 5:
+        printf("%d cal %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+        data_stack[sp + 1]  = 0;
+        data_stack[sp + 2]  = base(ir->l, bp, data_stack);
+        data_stack[sp + 3]  = bp;
+        data_stack[sp + 4]  = pc;
+        bp = sp + 1;
+        pc = ir->m;
+        super_output(pc, bp, sp, data_stack, reg, activate);
+        activate = 1;
+        break;
+
+       case 6:
+         printf("%d inc %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+         sp = sp + ir->m;
+         super_output(pc, bp, sp, data_stack, reg, activate);
+         break;
+
+       case 7:
+         printf("%d jmp %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+         pc = ir->m;
+         super_output(pc, bp, sp, data_stack, reg, activate);
+         break;
+
+       case 8:
+         printf("%d jpc %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+         if(reg[ir->r] == 0)
+         {
+             pc = ir->m;
+         }
+         super_output(pc, bp, sp, data_stack, reg, activate);
+         break;
+
+       case 9:
+         printf("%d sio %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+         printf("%d", reg[ir->r]);
+         super_output(pc, bp, sp, data_stack, reg, activate);
+         break;
+
+         case 10:
+           printf("%d sio %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+           //stated in class to let the user know what they were scanning in
+           printf("read in the register at index ir->r");
+           scanf("%d", &reg[ir->r]);
+           super_output(pc, bp, sp, data_stack, reg, activate);
+           break;
+
+        case 11:
+          printf("%d sio %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          halt = 0;
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 12:
+          printf("%d neg %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = -reg[ir->r];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 13:
+          printf("%d add %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] + reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 14:
+          printf("%d sub %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] - reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 15:
+          printf("%d mul %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] * reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 16:
+          printf("%d div %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] / reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 17:
+          printf("%d odd %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] % 2;
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 18:
+          printf("%d mod %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] %  reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 19:
+          printf("%d eql %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] == reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 20:
+          printf("%d neq %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] != reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 21:
+          printf("%d lss %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] < reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        case 22:
+          printf("%d leq %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] <= reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+         case 23:
+          printf("%d gtr %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] <= reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+          break;
+
+        default:
+          printf("%d geq %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
+          reg[ir->r] = reg[ir->l] >= reg[ir->m];
+          super_output(pc, bp, sp, data_stack, reg, activate);
+      }
+      ir = fetchCycle(code, ir, pc++);
+  }
+  return;
+}
+
+// Takes in L (level), base, and the array representation of the stack. Returns
+// a value in the stack that has some significance ???
+int base(int l, int base, int* data_stack)
+{
+  int b1; //find base L levels down
+  b1 = base;
+  while (l > 0)
+  {
+    b1 = data_stack[b1 + 1];
+    l--;
+  }
+  return b1;
+}
+
+// Returns the address of a lexeme object loaded with t and str
 lexeme *createLexeme(token_type t, char *str)
 {
 	lexeme *l = malloc(1 * sizeof(lexeme));
 	l->type = t;
-  l->lexeme = malloc(sizeof(char) * MAX_IDENT_LENGTH);
-  strcpy(l->lexeme, str);
+  l->lex = malloc(sizeof(char) * MAX_IDENT_LENGTH);
+  strcpy(l->lex, str);
 	return l;
 }
 
@@ -101,10 +378,11 @@ char* trim(char *str, char *trimmed)
   return trimmed;
 }
 
-// Parses words from the code to be evaluated, adds them to the lexeme array,
+// Parses words from the code to be evaluated, adds them to the lexeme array (list),
+// converts them to assembly, adds them to the instruction array (ins),
 // and returns the number of lexemes that were added to the array or 0 if there
 // was an error
-int parse(char *code, lexeme list[], FILE *fplex, symbol symbol_table[])
+int parse(char *code, instruction ins[], lexeme list[], FILE *fplex, symbol symbol_table[])
 {
   lexeme *lexptr;
   int lp = 0, rp, length, i, listIndex = 0, symIndex = 0;
@@ -313,12 +591,13 @@ bool isNumber(char *str)
   return true;
 }
 
-// return true if the string is a reserved keyword and false otherwise
+// returns true if the string is a reserved keyword and false otherwise
 bool isReserved(char *str)
 {
   // Table of reserved word names
-  char reserved[14][9] = { "const", "var", "procedure", "call", "begin", "end",
-                           "if", "then", "else", "while", "do", "read", "write",
+  // Procedure, else, and call are treated as identifiers for this assignment
+  char reserved[14][9] = { "const", "var", "begin", "end",
+                           "if", "then", "while", "do", "read", "write",
                            "odd" };
 
   if (str[0] == 'b')
@@ -513,45 +792,66 @@ token_type reserved(char *str)
   return 0;
 }
 
-// Prints leveme list to output file
-void output(lexeme list[], int count, FILE *fplex, bool l, bool a, bool v)
+// Prints data to output file as requested by command line arguments
+void output(lexeme list[], instruction ins[], int count, FILE *fplex, bool l, bool a, bool v)
 {
   int i = 0;
   char buffer[13] = {'\0'};
 
+  // In the absence of commands, just printing "in" and "out"
   if (l == false && a == false && v == false)
   {
     fprintf(fplex, "in\tout\n");
     return;
   }
+
+  // If commanded to print list of lexemes, printing all elements of list and
+  // their symbol type (from token_type)
   if (l == true)
   {
     fprintf(fplex, "List of lexemes:\n\n");
     for (i = 0; i < count; i++)
     {
-      fprintf(fplex, "%s", list[i].lexeme);
+      fprintf(fplex, "%s", list[i].lex);
       (i % 10 == 0) ? fprintf(fplex, "\n") : fprintf(fplex, "\t");
     }
     fprintf(fplex, "\n\nSymbolic representation:\n\n");
     for (i = 0; i < count; i++)
     {
       // fprintf(fplex, "%s", list[i].type);
-      // call print to conver number to string
+      // call print to convert number to string
       print(list[i].type);
       (i % 10 == 0) ? fprintf(fplex, "\n") : fprintf(fplex, "\t");
     }
     fprintf(fplex, "\nNo errors, program is syntactically correct\n\n");
   }
+
+  // If commanded to print generated assembly code, printing all elements of ins
   if (a == true)
   {
-
+    // for(i = 0; i < MAX_CODE_LENGTH; i++ )
+    // {
+    //   ins[i].op = 0;
+    //   ins[i].r = 0;
+    //   ins[i].l = 0;
+    //   ins[i].m = 0;
+    //
+    //   i = 0;
+    //   while((ins[i].op != 0 && ins[i].r != 0 && ins[i].l !=0 && ins[i].m !=0))
+    //   {
+    //     fprintf(fplex, "%d %d %d %d \n", ins[i].op, ins[i].r, ins[i].l, ins[i].m);
+    //     i++;
+    //   }
+    // }
   }
+
   if (v == true)
   {
 
   }
 }
 
+// Given the value of token symbol, prints the type of token symbol
 void print(int tokenRep)
 {
   switch (tokenRep)
@@ -644,119 +944,119 @@ void getToken(token current)
   }
   else
   {
-    current.type[0] = '\0';
+    current.type = nulsym;
     current.value[0] = '\0';
   }
 }
 
+// Prints a unique error message for each error code
 void findError(int errorNum)
 {
-    switch( errorNum )
-    {
+  switch( errorNum )
+  {
+    case 1:
+      printf("Use = instead of := \n");
+      break;
 
-      case 1:
-        printf("Use = instead of := \n");
-        break;
+    case 2:
+      printf("= must be followed by a number \n");
+      break;
 
-      case 2:
-        printf("= must be followed by a number \n");
-        break;
+    case 3:
+      printf("Identifier must be followed by = \n");
+      break;
 
-      case 3:
-        printf("Identifier must be followed by = \n");
-        break;
+    case 4:
+      printf("const, int, procedure must be followed by identifier\n");
+      break;
 
-      case 4:
-        printf("const, int, procedure must be followed by identifier\n");
-        break;
+    case 5:
+      printf("Semicolon or comma missing\n");
+      break;
 
-      case 5:
-        printf("Semicolon or comma missing\n");
-        break;
+    case 6:
+      printf("Incorrect symbol after procedure declaration\n");
+      break;
 
-      case 6:
-        printf("Incorrect symbol after procedure declaration\n");
-        break;
+    case 7:
+      printf("Statement expected\n");
+      break;
 
-      case 7:
-        printf("Statement expected\n");
-        break;
+    case 8:
+      printf("Incorrect symbol after statement part in block\n");
+      break;
 
-      case 8:
-        printf("Incorrect symbol after statement part in block\n");
-        break;
+    case 9:
+      printf("Period expected\n");
+      break;
 
-      case 9:
-        printf("Period expected\n");
-        break;
+    case 10:
+      printf("Semicolon between statements missing\n");
+      break;
 
-      case 10:
-        printf("Semicolon between statements missing\n");
-        break;
+    case 11:
+      printf("Undeclared identifier \n");
+      break;
 
-      case 11:
-        printf("Undeclared identifier \n");
-        break;
+    case 12:
+      printf("Assignment to constant or procedure is not allowed\n");
+      break;
 
-      case 12:
-        printf("Assignment to constant or procedure is not allowed\n");
-        break;
+    case 13:
+      printf("Assignment operator expected\n");
+      break;
 
-      case 13:
-        printf("Assignment operator expected\n");
-        break;
+    case 14:
+      printf("Call must be followed by an identifier\n");
+      break;
 
-      case 14:
-        printf("Call must be followed by an identifier\n");
-        break;
+    case 15:
+      printf("Call of a constant or variable is meaningless\n");
+      break;
 
-      case 15:
-        printf("Call of a constant or variable is meaningless\n");
-        break;
+    case 16:
+      printf("Then expected\n");
+      break;
 
-      case 16:
-        printf("Then expected\n");
-        break;
+    case 17:
+      printf("Semicolon or } expected \n");
+      break;
 
-      case 17:
-        printf("Semicolon or } expected \n");
-        break;
+    case 18:
+      printf("Do expected\n");
+      break;
 
-      case 18:
-        printf("Do expected\n");
-        break;
+    case 19:
+      printf("Incorrect symbol following statement\n");
+      break;
 
-      case 19:
-        printf("Incorrect symbol following statement\n");
-        break;
+    case 20:
+      printf("Relational operator expected\n");
+      break;
 
-      case 20:
-        printf("Relational operator expected\n");
-        break;
+    case 21:
+      printf("Expression must not contain a procedure identifier\n");
+      break;
 
-      case 21:
-        printf("Expression must not contain a procedure identifier\n");
-        break;
+    case 22:
+      printf("Right parenthesis missing\n");
+      break;
 
-      case 22:
-        printf("Right parenthesis missing\n");
-        break;
+    case 23:
+      printf("The preceding factor cannot begin with this symbol\n");
+      break;
 
-      case 23:
-        printf("The preceding factor cannot begin with this symbol\n");
-        break;
+    case 24:
+      printf("An expression cannot begin with this symbol\n");
+      break;
 
-      case 24:
-        printf("An expression cannot begin with this symbol\n");
-        break;
+    case 25:
+      printf("This number is too large\n");
+      break;
 
-      case 25:
-        printf("This number is too large\n");
-        break;
-
-      default:
-      printf("Invalid instruction");
-    }
+    default:
+    printf("Invalid instruction");
+  }
 }
 
 // Stores passed values in symbol table
@@ -813,6 +1113,7 @@ int block(token current)
       getToken(current);
       if (current.type != identsym)
       {
+        printf("1107\n");
         findError(4);
         return 0;
       }
@@ -884,10 +1185,36 @@ int program(token current)
   return 1;
 }
 
+// Returns the index at which the identifier was found if the identifier is
+// already a member of the lexeme list or 0 if it was not
+int find(char *identifier, lexeme list[])
+{
+  int i;
+  while (list[i].lex != NULL && list[i].type != nulsym)
+  {
+    if (strcmp(identifier, list[i].lex) == 0)
+    {
+      return i;
+    }
+  }
+  return 0;
+}
+
 int statement(token current)
 {
   if(current.type == identsym)
   {
+    int i = find(ident);
+    if (i == 0)
+    {
+      findError(11);
+      return 0;
+    }
+    if (symboltype(i) != 3)
+    {
+      findError(12);
+      return 0;
+    }
     getToken(current);
     if(current.type != becomessym)
     {
@@ -896,6 +1223,7 @@ int statement(token current)
     }
     getToken(current);
     expression(current);
+    gen(STO, symbollevel(i), symboladdress(i)); // needs attention
   }
   else if(current.type == callsym )
   {
@@ -1048,9 +1376,10 @@ int main(int argc, char **argv)
   fplex = fopen(argv[2], "w+");
   char aSingleLine[MAX_CODE_LENGTH], code[MAX_CODE_LENGTH] = {'\0'},
        trimmed[MAX_CODE_LENGTH] = {'\0'}, commands[3][3];
-  lexeme list[MAX_CODE_LENGTH] = {'\0'};
+  lexeme list[MAX_CODE_LENGTH];
   int count, i, tokens[MAX_SYMBOL_TABLE_SIZE] = {'\0'};
   symbol symbol_table[MAX_SYMBOL_TABLE_SIZE];
+  instruction ins[MAX_CODE_LENGTH];
   token current;
   bool l = false, a = false, v = false;
 
@@ -1074,7 +1403,6 @@ int main(int argc, char **argv)
     strcpy(commands[1], argv[4]);
     strcpy(commands[2], argv[5]);
   }
-
   for (i = 0; i < (argc - 3); i++)
   {
     if (strcmp(commands[i], "-l") == 0)
@@ -1084,7 +1412,15 @@ int main(int argc, char **argv)
     if (strcmp(commands[i], "-v") == 0)
       v = true;
   }
-  // Preventing file errors by checking for failures to open files
+
+  // Initializing lexeme list
+  for (i = 0; i < MAX_CODE_LENGTH; i++)
+  {
+    list[i].type = nulsym;
+    list[i].lex = NULL;
+  }
+
+  // Preventing segfault by checking for failures to open files
   if (fpin == NULL)
   {
     printf("File not found\n");
@@ -1107,31 +1443,16 @@ int main(int argc, char **argv)
   strcpy(code, trim(code, trimmed));
   // Filling lexeme array and capturing number of elements of lexeme array
   // (or 0 if parse found errors)
-  count = parse(code, list, fplex);
+  count = parse(code, ins, list, fplex, symbol_table);
 
   if (count == 0)
   {
     fprintf(fplex, "Error(s), program is not syntactically correct\n");
     return 0;
   }
-	
-  for(i; i < MAX_CODE_LENGTH; i++ ){
-    code[i].op = 0;
-    code[i].r = 0;
-    code[i].l = 0;
-    code[i].m = 0;
-  }
-	
   // Printing output
-  output(list, count, fplex, l, a, v); // <- change so that this line only executes if parse is successful
+  output(list, ins, count, fplex, l, a, v);
   block(current);
-	
-  i=0;
-  while((code[i].op != 0 && code[i].r != 0 && code[i].l !=0 && code[i].m !=0))
-  {
-    fprintf(fplex, "%d %d %d %d \n", code[i].op, code[i].r, code[i].l, code[i].m)
-    i++
-  }
 
   fclose(fpin);
   fclose(fplex);
