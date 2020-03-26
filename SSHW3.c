@@ -9,26 +9,6 @@
 // the text as a list of lexemes and converts those lexemes into assembly code.
 // That assembly code is then passed to our virtual machine to be executed.
 
-/*
-
-int symboladdress(int i)
-{
-    int a=0;
-    while(list[a] < MAX_CODE_LENGTH)
-    {
-      if(list[a] == i)
-      {
-        return a;
-      }
-      a++;
-    }
-    return -1;
-    
-}
-
-
-*/
-
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -40,8 +20,6 @@ int symboladdress(int i)
 #define MAX_NUM_LENGTH 5
 #define MAX_CODE_LENGTH 550
 #define MAX_SYMBOL_TABLE_SIZE 500
-
-FILE *fpin, *fplex;
 
 typedef enum
 {
@@ -82,6 +60,9 @@ typedef struct
   int addr; // M
 } symbol;
 
+FILE *fpin, *fplex;
+lexeme list[MAX_CODE_LENGTH];
+
 int base(int l, int base, int* data_stack);
 char* trim(char *str, char *trimmed);
 int parse(char *code, instruction ins[], lexeme list[], FILE *fplex, symbol symbol_table[]);
@@ -94,7 +75,6 @@ void output(lexeme list[], instruction ins[], int count, FILE *fplex, bool l, bo
 int block(token current);
 int symboltype(int i);
 int symbollevel(int i);
-int symboladdress(int i);
 int statement(token current);
 int condition(token current);
 void expression(token current);
@@ -841,7 +821,6 @@ void output(lexeme list[], instruction ins[], int count, FILE *fplex, bool l, bo
     fprintf(fplex, "\n\nSymbolic representation:\n\n");
     for (i = 0; i < count; i++)
     {
-      // fprintf(fplex, "%s", list[i].type);
       // call print to convert number to string
       print(list[i].type);
       (i % 10 == 0) ? fprintf(fplex, "\n") : fprintf(fplex, "\t");
@@ -870,7 +849,8 @@ void output(lexeme list[], instruction ins[], int count, FILE *fplex, bool l, bo
 
   if (v == true)
   {
-
+    // print generated code
+    // print virtual machine execution trace
   }
 }
 
@@ -1229,21 +1209,15 @@ int symboltype(int i)
   {
     return 1;
   }
-
   if(i == 29)
   {
     return 2;
   }
-
-  if(i==30)
+  if(i == 30)
   {
     return 3;
   }
-
-  else{
-    return 0;
-  }
-
+  return 0;
 }
 
 int symbollevel(int i)
@@ -1251,13 +1225,28 @@ int symbollevel(int i)
   return 0;
 }
 
+void gen(int op, int l, int m)
+{
+  return;
+}
 
+int symboladdress(int i)
+{
+  for (int a = 0; a < MAX_CODE_LENGTH; a++)
+  {
+    if(list[a].type == i)
+    {
+      return a;
+    }
+  }
+  return -1;
+}
 
 int statement(token current)
 {
   if(current.type == identsym)
   {
-    int i = find(ident);
+    int i = find(current.value, list);
     if (i == 0)
     {
       findError(11);
@@ -1276,7 +1265,7 @@ int statement(token current)
     }
     getToken(current);
     expression(current);
-    gen(STO, symbollevel(i), symboladdress(i)); // needs attention
+    gen(4, symbollevel(i), symboladdress(i)); // needs attention
   }
   else if(current.type == callsym )
   {
@@ -1429,7 +1418,6 @@ int main(int argc, char **argv)
   fplex = fopen(argv[2], "w+");
   char aSingleLine[MAX_CODE_LENGTH], code[MAX_CODE_LENGTH] = {'\0'},
        trimmed[MAX_CODE_LENGTH] = {'\0'}, commands[3][3];
-  lexeme list[MAX_CODE_LENGTH];
   int count, i, tokens[MAX_SYMBOL_TABLE_SIZE] = {'\0'};
   symbol symbol_table[MAX_SYMBOL_TABLE_SIZE];
   instruction ins[MAX_CODE_LENGTH];
