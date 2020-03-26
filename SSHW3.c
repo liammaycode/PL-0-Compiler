@@ -72,6 +72,8 @@ bool isNumber(char *str);
 bool isSymbol(char symbol);
 void output(lexeme list[], instruction ins[], int count, FILE *fplex, bool l, bool a, bool v);
 int block(token current);
+int symboltype(int i);
+int symbollevel(int i);
 int statement(token current);
 int condition(token current);
 void expression(token current);
@@ -1197,6 +1199,34 @@ int find(char *identifier, lexeme list[])
       return i;
     }
   }
+  return 0;
+}
+
+int symboltype(int i)
+{
+  if(i == 28)
+  {
+    return 1;
+  }
+
+  if(i == 29)
+  {
+    return 2;
+  }
+
+  if(i==30)
+  {
+    return 3;
+  }
+
+  else{
+    return 0;
+  }
+
+}
+
+int symbollevel(int i)
+{
   return 0;
 }
 
