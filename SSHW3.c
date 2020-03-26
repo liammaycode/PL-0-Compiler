@@ -9,6 +9,26 @@
 // the text as a list of lexemes and converts those lexemes into assembly code.
 // That assembly code is then passed to our virtual machine to be executed.
 
+/*
+
+int symboladdress(int i)
+{
+    int a=0;
+    while(list[a] < MAX_CODE_LENGTH)
+    {
+      if(list[a] == i)
+      {
+        return a;
+      }
+      a++;
+    }
+    return -1;
+    
+}
+
+
+*/
+
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -74,6 +94,7 @@ void output(lexeme list[], instruction ins[], int count, FILE *fplex, bool l, bo
 int block(token current);
 int symboltype(int i);
 int symbollevel(int i);
+int symboladdress(int i);
 int statement(token current);
 int condition(token current);
 void expression(token current);
@@ -1229,6 +1250,8 @@ int symbollevel(int i)
 {
   return 0;
 }
+
+
 
 int statement(token current)
 {
