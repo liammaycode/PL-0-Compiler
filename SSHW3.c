@@ -83,7 +83,7 @@ FILE *fpin, *fplex;
 lexeme list[MAX_CODE_LENGTH];
 instruction ins[MAX_CODE_LENGTH];
 symbol symbol_table[MAX_SYMBOL_TABLE_SIZE];
-int ins_cntr = 1;
+int ins_cntr = 0;
 
 // Returns address of a new construction object
 instruction *create_instruction(int op, int r, int l, int m)
@@ -946,33 +946,22 @@ void output(lexeme list[], instruction ins[], int count, FILE *fplex, bool l, bo
       print(list[i].type);
       (i % 10 == 0) ? fprintf(fplex, "\n") : fprintf(fplex, "\t");
     }
-    fprintf(fplex, "\nNo errors, program is syntactically correct\n\n");
+    fprintf(fplex, "\n\nNo errors, program is syntactically correct\n\n");
   }
 
   // If commanded to print generated assembly code, printing all elements of ins
   if (a == true)
   {
-    for(i = 0; i < MAX_CODE_LENGTH; i++ )
+    i = 0;
+    while((ins[i].op != 0 && ins[i].r != 0 && ins[i].l !=0 && ins[i].m !=0)) // <--- not ever entering loop because ins[] never gets filled ???
     {
-      ins[i].op = 0;
-      ins[i].r = 0;
-      ins[i].l = 0;
-      ins[i].m = 0;
-
-      i = 0;
-      while((ins[i].op != 0 && ins[i].r != 0 && ins[i].l !=0 && ins[i].m !=0))
-      {
-        fprintf(fplex, "%d %d %d %d \n", ins[i].op, ins[i].r, ins[i].l, ins[i].m);
-        i++;
-      }
+      fprintf(fplex, "%d %d %d %d \n", ins[i].op, ins[i].r, ins[i].l, ins[i].m);
+      i++;
     }
   }
 
   if (v == true)
   {
-    // print generated code
-    // Printing virtual machine execution trace
-
     // Converting instruction array to int array
     int code[MAX_CODE_LENGTH];
     for (i = 0; i < ins_cntr; i++)
@@ -983,6 +972,14 @@ void output(lexeme list[], instruction ins[], int count, FILE *fplex, bool l, bo
       code[i + 4] = ins[i].m;
     }
 
+    // Printing generated code
+    for (i = 0; i < ins_cntr; i++)
+    {
+      fprintf(fplex, "%d", code[i]);
+      (i % 4 == 0) ? fprintf(fplex, "\n") : fprintf(fplex, "\t");
+    }
+
+    // Printing virtual machine execution trace
     print_stack(code, ins_cntr);
     executionCycle(code);
   }
