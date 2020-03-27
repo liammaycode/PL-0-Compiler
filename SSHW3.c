@@ -9,6 +9,54 @@
 // the text as a list of lexemes and converts those lexemes into assembly code.
 // That assembly code is then passed to our virtual machine to be executed.
 
+//vvvvvvvvvvvvvvvvvvvvvvvvvvv SYMBOL ADDRESS vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+/*
+
+
+
+
+
+
+
+
+//function that returns address for the symbol table 
+int symboladdress(int i)
+{
+    //a is our counter that will read through
+    //the lexeme list. b is the address and starts at 4 to save room
+    //for fav, dl, sl, and ra
+    int a=0, b=4;
+    //go through the lexeme 
+    while(list[a] < MAX_CODE_LENGTH)
+    {
+      if(list[a] == i)
+      {
+        //if we found what we are looking for then return the address
+        return b;
+      }
+
+      //if we hit a semicolon we know we are a new line
+      //set the address back to four
+      if(list[a] == 18)
+      {
+        b=4;
+      }
+    //increment counters before we loop again
+    a++;
+    b++;
+    }
+
+    //return 0 if otherwise
+    return 0;
+    
+}
+
+
+
+
+
+*/
+
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
