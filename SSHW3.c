@@ -3,96 +3,6 @@
 // COP 3402
 // Spring 2020
 
-
-/*
-
-
-
-int block(token current)
-{
-  if (current.type == constsym)
-  {
-    while (current.type == commasym)
-    {
-      getToken(current);
-      if (current.type != identsym)
-      {
-        //ERROR OVER HERE
-        findError(4);
-        return 0;
-      }
-      getToken(current);
-      if (current.type != eqlsym)
-      {
-        findError(3);
-        return 0;
-      }
-      getToken(current);
-      if (current.type != numbersym)
-      {
-        findError(2);
-        return 0;
-      }
-      getToken(current);
-    }
-    if (current.type != semicolonsym)
-    {
-      findError(5);
-      return 0;
-    }
-    getToken(current);
-  }
-
-
-  if (current.type == varsym)
-  {
-    while (current.type == commasym)
-    {
-      getToken(current);
-      if (current.type != identsym)
-      {
-        //ERROR IS OVER HERE
-        findError(4);
-        return 0;
-      }
-      getToken(current);
-    }
-    if (current.type != semicolonsym)
-    {
-      findError(5);
-      return 0;
-    }
-    getToken(current);
-  }
-  while (current.type == procsym)
-  {
-    getToken(current);
-    if (current.type != identsym)
-    {
-      findError(4);
-      return 0;
-    }
-    getToken(current);
-    if (current.type != semicolonsym)
-    {
-      findError(5);
-      return 0;
-    }
-    getToken(current);
-  }
-  statement(current);
-}
-
-
-
-
-
-
-
-
-
-*/
-
 // This program is a representation of a PL/0 compiler in C. It contains a compiler
 // driver, a parser, and an intermediate code generator.
 // This code takes as input a text file containing PL/0 code. It then represents
@@ -1042,20 +952,20 @@ void output(lexeme list[], instruction ins[], int count, FILE *fplex, bool l, bo
   // If commanded to print generated assembly code, printing all elements of ins
   if (a == true)
   {
-    // for(i = 0; i < MAX_CODE_LENGTH; i++ )
-    // {
-    //   ins[i].op = 0;
-    //   ins[i].r = 0;
-    //   ins[i].l = 0;
-    //   ins[i].m = 0;
-    //
-    //   i = 0;
-    //   while((ins[i].op != 0 && ins[i].r != 0 && ins[i].l !=0 && ins[i].m !=0))
-    //   {
-    //     fprintf(fplex, "%d %d %d %d \n", ins[i].op, ins[i].r, ins[i].l, ins[i].m);
-    //     i++;
-    //   }
-    // }
+    for(i = 0; i < MAX_CODE_LENGTH; i++ )
+    {
+      ins[i].op = 0;
+      ins[i].r = 0;
+      ins[i].l = 0;
+      ins[i].m = 0;
+
+      i = 0;
+      while((ins[i].op != 0 && ins[i].r != 0 && ins[i].l !=0 && ins[i].m !=0))
+      {
+        fprintf(fplex, "%d %d %d %d \n", ins[i].op, ins[i].r, ins[i].l, ins[i].m);
+        i++;
+      }
+    }
   }
 
   if (v == true)
@@ -1307,24 +1217,28 @@ int block(token current)
 {
   if (current.type == constsym)
   {
-    while (current.type != commasym)
+    while (current.type == commasym)
     {
       getToken(current);
       if (current.type != identsym)
       {
+        //ERROR OVER HERE
         findError(4);
         return 0;
       }
+      getToken(current);
       if (current.type != eqlsym)
       {
         findError(3);
         return 0;
       }
+      getToken(current);
       if (current.type != numbersym)
       {
         findError(2);
         return 0;
       }
+      getToken(current);
     }
     if (current.type != semicolonsym)
     {
@@ -1333,13 +1247,14 @@ int block(token current)
     }
     getToken(current);
   }
-  if (current.type = varsym) // ???
+  if (current.type == varsym)
   {
-    while (current.type != commasym)
+    while (current.type == commasym)
     {
       getToken(current);
       if (current.type != identsym)
       {
+        //ERROR IS OVER HERE
         findError(4);
         return 0;
       }
@@ -1357,7 +1272,7 @@ int block(token current)
     getToken(current);
     if (current.type != identsym)
     {
-      findError(4); // maybee???????
+      findError(4);
       return 0;
     }
     getToken(current);
@@ -1368,35 +1283,9 @@ int block(token current)
     }
     getToken(current);
   }
-  while (current.type == procsym)
-  {
-    getToken(current);
-    if (current.type != identsym)
-    {
-      findError(4); // ???
-      return 0;
-    }
-    getToken(current);
-    if (current.type != semicolonsym)
-    {
-      findError(5);
-      return 0;
-    }
-    getToken(current);
-    block(current);
-
-    if (current.type != semicolonsym)
-    {
-      findError(5);
-      return 0;
-    }
-    getToken(current);
-  }
-  if (statement(current) == 0)
-    return 0;
-
-  return 1;
+  statement(current);
 }
+
 
 int program(token current)
 {
@@ -1469,22 +1358,22 @@ int symboladdress(int i)
   //for fav, dl, sl, and ra
   int a=0, b=4;
   //go through the lexeme
-  while(list[a] < MAX_CODE_LENGTH)
+  while(a < MAX_CODE_LENGTH)
   {
-    if(list[a] == i)
+    if(list[a].type == i)
     {
       //if we found what we are looking for then return the address
       return b;
     }
     //if we hit a semicolon we know we are a new line
     //set the address back to four
-    if(list[a] == 18)
+    if(list[a].type == 18)
     {
       b=4;
     }
-  //increment counters before we loop again
-  a++;
-  b++;
+    //increment counters before we loop again
+    a++;
+    b++;
   }
   //return 0 if otherwise
   return 0;
