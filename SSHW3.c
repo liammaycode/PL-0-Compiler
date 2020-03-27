@@ -20,6 +20,7 @@
 #define MAX_NUM_LENGTH 5
 #define MAX_CODE_LENGTH 550
 #define MAX_SYMBOL_TABLE_SIZE 500
+#define MAX_LEXI_LEVELS 3
 
 typedef enum
 {
@@ -446,7 +447,9 @@ void executionCycle(int *code)
 
         default:
           fprintf(fplex, "%d geq %d %d %d\t", ((pc - 1) < 0) ? 0 : pc - 1, ir->r, ir->l, ir->m);
-          reg[ir->r] = reg[ir->l] >= reg[ir->m];
+          // printf("%d %d %d\n", ir->r, ir->l, ir->m); // <- debugging
+          reg[ir->r] = reg[ir->l]; // At this point l and m are hUGE ???
+          reg[ir->l] = reg[ir->m];
           super_output(pc, bp, sp, data_stack, reg, activate);
       }
       ir = fetchCycle(code, ir, pc++);
@@ -1212,6 +1215,7 @@ void insertSymbol(int counter, symbol symbol_table[], int kind, char name[], int
 
 int block(token current)
 {
+  printf("Inside of block...\n");
   if (current.type == constsym)
   {
     while (current.type == commasym)
@@ -1219,7 +1223,6 @@ int block(token current)
       getToken(current);
       if (current.type != identsym)
       {
-        //ERROR OVER HERE
         findError(4);
         return 0;
       }
@@ -1251,7 +1254,6 @@ int block(token current)
       getToken(current);
       if (current.type != identsym)
       {
-        //ERROR IS OVER HERE
         findError(4);
         return 0;
       }
@@ -1279,16 +1281,24 @@ int block(token current)
       return 0;
     }
     getToken(current);
+    block(current);
+    if (current.type != semicolonsym)
+    {
+      findError(5);
+      return 0;
+    }
   }
   statement(current);
 }
 
-
 int program(token current)
 {
+  printf("Inside of program...\n");
   getToken(current);
   if (block(current) == 0)
+  {
     return 0;
+  }
   if(current.type != periodsym)
   {
     findError(9);
@@ -1378,6 +1388,7 @@ int symboladdress(int i)
 
 int statement(token current)
 {
+  printf("Inside of statement...\n");
   if(current.type == identsym)
   {
     int i = find(current.value);
@@ -1433,7 +1444,6 @@ int statement(token current)
     }
     getToken(current);
   }
-
   else if(current.type == ifsym)
   {
     getToken(current);
@@ -1446,6 +1456,7 @@ int statement(token current)
       findError(16);
       return 0;
     }
+    getToken(current);
     if (statement(current) == 0)
     {
       return 0;
@@ -1460,11 +1471,13 @@ int statement(token current)
     }
     if(current.type != dosym)
     {
-      getToken(current);
-      if (statement(current) == 0)
-      {
-        return 0;
-      }
+      findError(18); // needs attention
+      return 0;
+    }
+    getToken(current);
+    if (statement(current) == 0)
+    {
+      return 0;
     }
   }
   return 1;
@@ -1472,6 +1485,7 @@ int statement(token current)
 
 int condition(token current)
 {
+  printf("Inside of condition...\n");
   if (current.type == oddsym)
   {
     getToken(current);
@@ -1494,7 +1508,13 @@ int condition(token current)
 
 void expression(token current)
 {
+  printf("Inside of expression...\n");
   if (current.type == plussym || current.type == minussym)
+  {
+    getToken(current);
+  }
+  term(current);
+  while (current.type == plussym || current.type == minussym)
   {
     getToken(current);
     term(current);
@@ -1504,6 +1524,7 @@ void expression(token current)
 
 void term(token current)
 {
+  printf("Inside of term...\n");
   if (factor(current) == 0)
   {
     return;
@@ -1520,6 +1541,7 @@ void term(token current)
 
 int factor(token current)
 {
+  printf("inside of factor...\n");
   if (current.type == identsym)
   {
     int i = find(current.value);
