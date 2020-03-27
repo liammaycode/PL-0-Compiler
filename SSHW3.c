@@ -3,6 +3,96 @@
 // COP 3402
 // Spring 2020
 
+
+/*
+
+
+
+int block(token current)
+{
+  if (current.type == constsym)
+  {
+    while (current.type == commasym)
+    {
+      getToken(current);
+      if (current.type != identsym)
+      {
+        //ERROR OVER HERE
+        findError(4);
+        return 0;
+      }
+      getToken(current);
+      if (current.type != eqlsym)
+      {
+        findError(3);
+        return 0;
+      }
+      getToken(current);
+      if (current.type != numbersym)
+      {
+        findError(2);
+        return 0;
+      }
+      getToken(current);
+    }
+    if (current.type != semicolonsym)
+    {
+      findError(5);
+      return 0;
+    }
+    getToken(current);
+  }
+
+
+  if (current.type == varsym)
+  {
+    while (current.type == commasym)
+    {
+      getToken(current);
+      if (current.type != identsym)
+      {
+        //ERROR IS OVER HERE
+        findError(4);
+        return 0;
+      }
+      getToken(current);
+    }
+    if (current.type != semicolonsym)
+    {
+      findError(5);
+      return 0;
+    }
+    getToken(current);
+  }
+  while (current.type == procsym)
+  {
+    getToken(current);
+    if (current.type != identsym)
+    {
+      findError(4);
+      return 0;
+    }
+    getToken(current);
+    if (current.type != semicolonsym)
+    {
+      findError(5);
+      return 0;
+    }
+    getToken(current);
+  }
+  statement(current);
+}
+
+
+
+
+
+
+
+
+
+*/
+
 // This program is a representation of a PL/0 compiler in C. It contains a compiler
 // driver, a parser, and an intermediate code generator.
 // This code takes as input a text file containing PL/0 code. It then represents
