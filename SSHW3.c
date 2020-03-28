@@ -73,21 +73,18 @@ void output(lexeme list[], instruction ins[], int count, FILE *fplex, bool l, bo
 int block(token current);
 int symboltype(int i);
 int symbollevel(int i);
-int symboladdress(int i);
 int statement(token current);
 int condition(token current);
 void expression(token current);
 void term(token current);
 int factor(token current);
 void print(int tokenRep);
-void gen(int op, int l, int m);
-int find(char *identifier);
 
 FILE *fpin, *fplex;
 lexeme list[MAX_CODE_LENGTH];
 instruction ins[MAX_CODE_LENGTH];
 symbol symbol_table[MAX_SYMBOL_TABLE_SIZE];
-int ins_cntr = 0, sym_ctr = 0;
+int ins_cntr = 0;
 
 // Returns address of a new construction object
 instruction *create_instruction(int op, int r, int l, int m)
@@ -959,10 +956,11 @@ void output(lexeme list[], instruction ins[], int count, FILE *fplex, bool l, bo
   if (a == true)
   {
     i = 0;
-    while((ins[i].op != 0 && ins[i].r != 0 && ins[i].l !=0 && ins[i].m !=0)) // <--- not ever entering loop because ins[] never gets filled ???
+    //while((ins[i].op != 0 && ins[i].r != 0 && ins[i].l !=0 && ins[i].m !=0)) // <--- not ever entering loop because ins[] never gets filled ???
+    for(int i=0; i<1000; i++)
     {
       fprintf(fplex, "%d %d %d %d \n", ins[i].op, ins[i].r, ins[i].l, ins[i].m);
-      i++;
+      //i++;
     }
   }
 
@@ -1072,8 +1070,9 @@ void getToken(token current)
   char buffer[MAX_CODE_LENGTH];
   if (fscanf(fplex, "%s", buffer) != EOF)
   {
-    current.type = atoi(buffer);
-    fscanf(fplex, "%s", buffer);
+
+      fscanf(fplex, "%s", buffer);
+
     strcpy(current.value, buffer);
   }
   else
@@ -1212,18 +1211,9 @@ void insertSymbol(int counter, symbol symbol_table[], int kind, char name[], int
 
 int block(token current)
 {
-  printf("Inside of block...\n"); // debugging
-  int i = find(current.value);
-  if (i == 0)
+  printf("Inside of block...\n");
+  if (current.type == constsym)
   {
-    findError(11);
-    return 0;
-  }
-  // gen(7, 0, 0);
-  if (current.type == constsym) // pseudocode says constsym but constsym = 28 and we need 29?
-  {
-    int i = find(current.value);
-    getToken(current);
     while (current.type == commasym)
     {
       getToken(current);
@@ -1294,9 +1284,7 @@ int block(token current)
       return 0;
     }
   }
-  // gen(6, 0, symboladdress(i));
   statement(current);
-  // gen(2, 0, 0);
 }
 
 int program(token current)
@@ -1357,7 +1345,7 @@ void gen(int op, int l, int m)
   if( ins_cntr <= MAX_CODE_LENGTH )
   {
     ins[ins_cntr].op = op;
-    ins[ins_cntr].r = 1;
+    //ins[ins_cntr].r = 0;
     ins[ins_cntr].l = l;
     ins[ins_cntr].m = m;
     ins_cntr++;
@@ -1397,15 +1385,9 @@ int symboladdress(int i)
 int statement(token current)
 {
   printf("Inside of statement...\n");
-  int i = find(current.value);
-  if (i == 0)
-  {
-    findError(11);
-    return 0;
-  }
   if(current.type == identsym)
   {
-    i = find(current.value);
+    int i = find(current.value);
     if (i == 0)
     {
       findError(11);
@@ -1483,7 +1465,6 @@ int statement(token current)
     {
       return 0;
     }
-    // gen(8, 0, 0);
     if(current.type != dosym)
     {
       findError(18); // needs attention
@@ -1494,26 +1475,17 @@ int statement(token current)
     {
       return 0;
     }
-    // gen(7, 0, symboladdress(i));
   }
-  gen(4, symbollevel(i), symboladdress(i));
   return 1;
 }
 
 int condition(token current)
 {
   printf("Inside of condition...\n");
-  int i = find(current.value);
-  if (i == 0)
-  {
-    findError(11);
-    return 0;
-  }
   if (current.type == oddsym)
   {
     getToken(current);
     expression(current);
-    // gen(16, symbollevel(i), 0);
   }
   else
   {
@@ -1526,7 +1498,6 @@ int condition(token current)
     }
     getToken(current);
     expression(current);
-    gen(4, symbollevel(i), symboladdress(i));
   }
   return 1;
 }
@@ -1581,7 +1552,7 @@ int factor(token current)
     }
     else if (symboltype(i) == 1)
     {
-      // gen(1, 0, symboladdress(i));
+      gen(1, 0, symboladdress(i));
     }
     else
     {
@@ -1697,14 +1668,5 @@ int main(int argc, char **argv)
   fclose(fpin);
   fclose(fplex);
   return 0;
-}
-
-void symbol_gen( int k, char name[], int val, int addr )
-{
-  symbol_table[sym_ctr].kind = k;
-  strcpy( symbol_table[sym_ctr].name, name );
-  symbol_table[sym_ctr].val = val;
-  symbol_table[sym_ctr].addr = addr;
-  sym_ctr++;
 }
 
